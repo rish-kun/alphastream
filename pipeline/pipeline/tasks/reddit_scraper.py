@@ -7,7 +7,7 @@ from celery import Task
 from sqlalchemy import text
 
 from pipeline.celery_app import app
-from pipeline.database import get_db
+from pipeline.database import check_schema_ready, get_db
 from pipeline.scrapers.reddit_client import RedditClient
 from pipeline.tasks.sentiment_analysis import analyze_article
 from pipeline.utils.deduplication import compute_content_hash
@@ -27,6 +27,9 @@ def scrape_subreddits() -> dict:
 
     Dispatches individual subreddit scrape tasks for parallel processing.
     """
+    if not check_schema_ready():
+        return {"status": "skipped", "reason": "database schema not ready"}
+
     logger.info("Starting Reddit scrape for %d subreddits", len(TARGET_SUBREDDITS))
     results = {}
     for subreddit in TARGET_SUBREDDITS:

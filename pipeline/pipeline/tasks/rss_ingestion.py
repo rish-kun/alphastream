@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 
 from pipeline.celery_app import app
-from pipeline.database import get_db
+from pipeline.database import check_schema_ready, get_db
 from pipeline.scrapers.rss_feeds import RSSFeedParser
 from pipeline.utils.deduplication import compute_content_hash
 from pipeline.utils.text_cleaner import clean_html
@@ -46,6 +46,9 @@ def fetch_all_feeds() -> dict:
     Iterates through all feed sources and dispatches individual
     feed fetch tasks for parallel processing.
     """
+    if not check_schema_ready():
+        return {"status": "skipped", "reason": "database schema not ready"}
+
     logger.info("Starting RSS ingestion for all feeds")
     results = {}
     for source_name, feed_urls in FEED_SOURCES.items():

@@ -3,7 +3,7 @@
 import logging
 
 from pipeline.celery_app import app
-from pipeline.database import get_db
+from pipeline.database import check_schema_ready, get_db
 from pipeline.scrapers.article_scraper import ArticleScraper
 from pipeline.utils.text_cleaner import clean_article_text
 from sqlalchemy import text
@@ -18,6 +18,9 @@ def scrape_pending_articles() -> dict:
     Queries the database for articles without full text content and
     dispatches individual scrape tasks for each.
     """
+    if not check_schema_ready():
+        return {"status": "skipped", "reason": "database schema not ready"}
+
     logger.info("Starting full-text scrape for pending articles")
 
     with get_db() as db:

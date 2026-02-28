@@ -44,8 +44,9 @@ def _make_db_ctx(mock_db):
 class TestRSSIngestion:
     """Tests for pipeline.tasks.rss_ingestion."""
 
+    @patch("pipeline.tasks.rss_ingestion.check_schema_ready", return_value=True)
     @patch("pipeline.tasks.rss_ingestion.fetch_single_feed")
-    def test_fetch_all_feeds_dispatches_tasks(self, mock_fetch_single):
+    def test_fetch_all_feeds_dispatches_tasks(self, mock_fetch_single, _mock_schema):
         """fetch_all_feeds should dispatch a task per feed URL."""
         from pipeline.tasks.rss_ingestion import fetch_all_feeds, FEED_SOURCES
 
@@ -144,9 +145,12 @@ class TestRSSIngestion:
 class TestWebScraper:
     """Tests for pipeline.tasks.web_scraper."""
 
+    @patch("pipeline.tasks.web_scraper.check_schema_ready", return_value=True)
     @patch("pipeline.tasks.web_scraper.scrape_article")
     @patch("pipeline.tasks.web_scraper.get_db")
-    def test_scrape_pending_dispatches(self, mock_get_db, mock_scrape_article):
+    def test_scrape_pending_dispatches(
+        self, mock_get_db, mock_scrape_article, _mock_schema
+    ):
         """scrape_pending_articles should dispatch scrape tasks for pending rows."""
         from pipeline.tasks.web_scraper import scrape_pending_articles
 
@@ -220,9 +224,12 @@ class TestWebScraper:
 class TestSentimentAnalysis:
     """Tests for pipeline.tasks.sentiment_analysis."""
 
+    @patch("pipeline.tasks.sentiment_analysis.check_schema_ready", return_value=True)
     @patch("pipeline.tasks.sentiment_analysis.analyze_article")
     @patch("pipeline.tasks.sentiment_analysis.get_db")
-    def test_analyze_pending_dispatches(self, mock_get_db, mock_analyze_article):
+    def test_analyze_pending_dispatches(
+        self, mock_get_db, mock_analyze_article, _mock_schema
+    ):
         """analyze_pending should dispatch tasks for articles needing analysis."""
         from pipeline.tasks.sentiment_analysis import analyze_pending
 

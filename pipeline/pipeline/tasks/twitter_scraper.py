@@ -6,7 +6,7 @@ from celery import Task
 from sqlalchemy import text
 
 from pipeline.celery_app import app
-from pipeline.database import get_db
+from pipeline.database import check_schema_ready, get_db
 from pipeline.scrapers.twitter_client import TwitterClient
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,9 @@ def scrape_twitter() -> dict:
     WARNING: Twitter scraping is experimental and may be unreliable
     due to API limitations and rate limiting.
     """
+    if not check_schema_ready():
+        return {"status": "skipped", "reason": "database schema not ready"}
+
     logger.warning(
         "Twitter scraping is experimental and may not work reliably. "
         "API access and rate limits apply."

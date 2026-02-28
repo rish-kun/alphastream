@@ -1,0 +1,17 @@
+__pycache__/
+*.py[codz]
+.venv/
+*.egg-info/
+.git/
+.env
+.env.*
+!.env.example
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+models/
+*.bin
+*.safetensors
+*.onnx

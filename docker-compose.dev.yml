@@ -1,12 +1,33 @@
 version: "3.9"
 
-services:
-  alphastream-postgres:
-    environment:
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5433:5432"
+# Development overrides — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
-  alphastream-redis:
-    ports:
-      - "6380:6379"
+services:
+  # ── Backend (FastAPI) — live reload ────────────────────────────────
+  alphastream-backend:
+    volumes:
+      - ./backend:/app
+    environment:
+      ENVIRONMENT: development
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # ── Pipeline: Celery Worker — volume mount for code changes ────────
+  alphastream-worker:
+    volumes:
+      - ./pipeline:/app
+
+  # ── Pipeline: Celery Beat — volume mount for code changes ──────────
+  alphastream-beat:
+    volumes:
+      - ./pipeline:/app
+
+  # ── Frontend (Next.js) — dev server with hot-reload ────────────────
+  alphastream-frontend:
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    command: ["bun", "run", "dev"]
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      NEXT_PUBLIC_WS_URL: ws://localhost:8000/api/v1

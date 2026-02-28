@@ -234,7 +234,9 @@ dump.rdb
 celerybeat-schedule*
 
 # ML Models (downloaded at runtime)
-models/
+# NOTE: Do NOT use bare "models/" here — it would also exclude backend/app/models/ (ORM models).
+/models/
+pipeline/models/
 *.bin
 *.safetensors
 *.onnx

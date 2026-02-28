@@ -86,7 +86,10 @@ def compute_all() -> dict:
 
     Dispatches individual computation tasks for each stock and sector.
     """
-    from pipeline.database import get_db
+    from pipeline.database import check_schema_ready, get_db
+
+    if not check_schema_ready():
+        return {"status": "skipped", "reason": "database schema not ready"}
 
     logger.info("Starting alpha metrics computation")
 

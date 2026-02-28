@@ -13,6 +13,7 @@ AlphaStream aggregates news from multiple sources (RSS feeds, web scraping, Redd
 - [Tech Stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
+- [Docker (Full Stack)](#docker-full-stack)
 - [Manual Setup (Step by Step)](#manual-setup-step-by-step)
 - [Configuration (.env)](#configuration-env)
 - [Running the Application](#running-the-application)
@@ -163,7 +164,8 @@ chmod +x scripts/*.sh
 # 3. Edit the .env file with your API keys (see Configuration section below)
 #    At minimum, you need GEMINI_API_KEYS for LLM features to work.
 
-# 4. Start PostgreSQL and Redis
+# 4. Start PostgreSQL and Redis (or skip this and use Docker for everything —
+#    see the "Docker (Full Stack)" section below)
 docker compose up -d
 
 # 5. Run database migrations and seed stock data
@@ -185,6 +187,86 @@ To stop everything:
 ```bash
 ./scripts/stop-local.sh
 ```
+
+If you want to run everything in Docker instead, see the [Docker (Full Stack)](#docker-full-stack) section.
+
+---
+
+## Docker (Full Stack)
+
+You can run **all** services -- frontend, backend, pipeline (Celery worker + beat), PostgreSQL, and Redis -- in Docker with a single command. No need to install Python, Node.js, uv, or Bun on your host machine. The only prerequisite is Docker.
+
+### Production Mode
+
+```bash
+# 1. Copy and configure .env
+cp .env.example .env
+# Edit .env with your API keys (see Configuration section below)
+
+# 2. Start the full stack
+docker compose up --build -d
+
+# That's it! All 6 services start automatically:
+#   - PostgreSQL + Redis          (infrastructure)
+#   - Backend                     (runs migrations + seeds data on startup)
+#   - Celery worker + beat        (pipeline)
+#   - Frontend                    (production build)
+```
+
+Once everything is up, open your browser:
+
+| Service | URL |
+|---------|-----|
+| Dashboard | http://localhost:3000 |
+| API Docs (Swagger) | http://localhost:8000/docs |
+| API Docs (ReDoc) | http://localhost:8000/redoc |
+| Health Check | http://localhost:8000/api/v1/health |
+
+### Development Mode (Live Code Reloading)
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+The development override file (`docker-compose.dev.yml`) makes the following changes:
+
+- **Backend** -- mounts `./backend` into the container and runs uvicorn with `--reload`, so code changes take effect immediately.
+- **Worker / Beat** -- mounts `./pipeline` into the containers so task code changes are picked up on the next execution.
+- **Frontend** -- mounts `./frontend/src` and `./frontend/public` into the container and runs `bun run dev` instead of the production build, giving you full hot-reload.
+
+### Useful Docker Commands
+
+```bash
+# Tail logs for a specific service
+docker compose logs -f alphastream-backend
+docker compose logs -f alphastream-worker
+
+# Check service status
+docker compose ps
+
+# Stop everything
+docker compose down
+
+# Stop and delete all data volumes (removes database data)
+docker compose down -v
+
+# Rebuild and restart only the backend
+docker compose up --build alphastream-backend
+```
+
+### Docker vs Local Development
+
+| | Docker | Local |
+|---|---|---|
+| Prerequisites | Docker only | Python 3.12, uv, Node.js, Bun |
+| Setup time | ~2 minutes | ~10 minutes |
+| Code hot-reload | Dev mode only | Always |
+| Port mapping | Same ports | Same ports |
+| Recommended for | Quick start, testing | Active development |
+
+### Port Mapping Note
+
+PostgreSQL is exposed on port **5433** (not 5432) and Redis on port **6380** (not 6379) to avoid conflicts with any local PostgreSQL or Redis instances you may already have running. Inside the Docker network, services communicate on the standard ports (5432 and 6379).
 
 ---
 
@@ -525,7 +607,7 @@ bun run vitest run src/__tests__/lib/api.test.ts
 as2/
 ├── .env.example                  # Environment variable template
 ├── .github/workflows/ci.yml     # CI pipeline (4 parallel jobs)
-├── docker-compose.yml            # PostgreSQL + Redis
+├── docker-compose.yml            # Full stack (all 6 services)
 ├── docker-compose.dev.yml        # Dev overrides
 ├── scripts/
 │   ├── setup.sh                  # First-time setup (installs everything)

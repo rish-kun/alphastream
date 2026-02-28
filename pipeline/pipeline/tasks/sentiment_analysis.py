@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from pipeline.celery_app import app
 from pipeline.config import settings
-from pipeline.database import get_db
+from pipeline.database import check_schema_ready, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,9 @@ def analyze_pending() -> dict:
     Queries the database for articles with full text but no sentiment
     score, and dispatches individual analysis tasks.
     """
+    if not check_schema_ready():
+        return {"status": "skipped", "reason": "database schema not ready"}
+
     logger.info("Starting sentiment analysis for pending articles")
 
     with get_db() as db:
