@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: alphastream-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: alphastream
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: alphastream-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (optional - for development)
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: alphastream-backend
+  #   environment:
+  #     DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/alphastream
+  #     REDIS_URL: redis://redis:6379/0
+  #     SECRET_KEY: your-secret-key-here-change-in-production
+  #   ports:
+  #     - "8000:8000"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./backend:/app
+
+  # Celery Worker (optional - for development)
+  # celery-worker:
+  #   build:
+  #     context: ./pipelines
+  #     dockerfile: Dockerfile
+  #   container_name: alphastream-celery
+  #   command: celery -A tasks worker --loglevel=info
+  #   environment:
+  #     DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/alphastream
+  #     REDIS_URL: redis://redis:6379/0
+  #     CELERY_BROKER_URL: redis://redis:6379/1
+  #   depends_on:
+  #     - redis
+  #     - postgres
+
+  # Celery Beat (optional - for scheduled tasks)
+  # celery-beat:
+  #   build:
+  #     context: ./pipelines
+  #     dockerfile: Dockerfile
+  #   container_name: alphastream-celery-beat
+  #   command: celery -A tasks beat --loglevel=info
+  #   environment:
+  #     DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/alphastream
+  #     REDIS_URL: redis://redis:6379/0
+  #     CELERY_BROKER_URL: redis://redis:6379/1
+  #   depends_on:
+  #     - redis
+  #     - postgres
+
+volumes:
+  postgres_data:
+  redis_data:
