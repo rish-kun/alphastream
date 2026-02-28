@@ -1,0 +1,58 @@
+# ============================================================
+# Infrastructure Only — PostgreSQL + Redis
+# ============================================================
+# Use this when running the application locally (backend,
+# pipeline, and frontend started as native processes) but you
+# want the database and cache running in Docker.
+#
+# Usage:
+#   docker compose -f docker-compose.infra.yml up -d
+#   docker compose -f docker-compose.infra.yml down
+#
+# Host-mapped ports:
+#   Postgres  -> localhost:5433
+#   Redis     -> localhost:6380
+# ============================================================
+
+services:
+  alphastream-postgres:
+    image: postgres:16-alpine
+    container_name: alphastream-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: alphastream
+    ports:
+      - "5433:5432"
+    volumes:
+      - alphastream_pgdata:/var/lib/postgresql/data
+    networks:
+      - alphastream
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  alphastream-redis:
+    image: redis:7-alpine
+    container_name: alphastream-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - alphastream_redisdata:/data
+    networks:
+      - alphastream
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  alphastream:
+    driver: bridge
+
+volumes:
+  alphastream_pgdata:
+  alphastream_redisdata:

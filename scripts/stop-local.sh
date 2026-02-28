@@ -10,7 +10,11 @@ echo "========================================="
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
 NC='\033[0m'
+
+# ── Stop application processes ──────────────────────────────────
+echo -e "${CYAN}Stopping application processes...${NC}"
 
 # Kill from PID file
 if [ -f "$PROJECT_DIR/.pids" ]; then
@@ -25,7 +29,7 @@ fi
 
 # Also kill by port (fallback)
 for port in 8000 3000; do
-    pid=$(lsof -ti :$port 2>/dev/null || true)
+    pid=$(lsof -ti :"$port" 2>/dev/null || true)
     if [ -n "$pid" ]; then
         echo -e "${YELLOW}Killing process on port $port (PID: $pid)${NC}"
         kill "$pid" 2>/dev/null || true
@@ -34,5 +38,15 @@ done
 
 # Kill celery processes
 pkill -f "celery.*alphastream" 2>/dev/null || true
+pkill -f "celery.*pipeline" 2>/dev/null || true
 
+echo -e "${GREEN}Application processes stopped.${NC}"
+
+# ── Stop infrastructure containers ──────────────────────────────
+echo ""
+echo -e "${CYAN}Stopping infrastructure containers...${NC}"
+docker compose -f "$PROJECT_DIR/docker-compose.infra.yml" down
+echo -e "${GREEN}Infrastructure containers stopped.${NC}"
+
+echo ""
 echo -e "${GREEN}All services stopped.${NC}"

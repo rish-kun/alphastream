@@ -7,14 +7,18 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 echo "========================================="
 echo "  AlphaStream India - Local Start"
 echo "========================================="
+echo ""
+echo "  Mode: app runs natively, DB + Redis in Docker"
+echo ""
 
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Check prerequisites
+# ── Prerequisite checks ────────────────────────────────────────
 check_command() {
     if ! command -v "$1" &> /dev/null; then
         echo -e "${RED}Error: $1 is not installed${NC}"
@@ -22,9 +26,30 @@ check_command() {
     fi
 }
 
+check_command docker
 check_command uv
 check_command bun
 check_command python3
+
+# ── Start infrastructure (Postgres + Redis) ────────────────────
+echo -e "${CYAN}Starting infrastructure containers...${NC}"
+docker compose -f "$PROJECT_DIR/docker-compose.infra.yml" up -d
+
+echo -e "${YELLOW}Waiting for Postgres to be healthy...${NC}"
+until docker inspect --format='{{.State.Health.Status}}' alphastream-postgres 2>/dev/null | grep -q "healthy"; do
+    sleep 1
+done
+echo -e "${GREEN}Postgres is ready.${NC}"
+
+echo -e "${YELLOW}Waiting for Redis to be healthy...${NC}"
+until docker inspect --format='{{.State.Health.Status}}' alphastream-redis 2>/dev/null | grep -q "healthy"; do
+    sleep 1
+done
+echo -e "${GREEN}Redis is ready.${NC}"
+
+# ── Start application processes ─────────────────────────────────
+echo ""
+echo -e "${CYAN}Starting application processes...${NC}"
 
 echo -e "${YELLOW}Starting backend...${NC}"
 cd "$PROJECT_DIR/backend"
@@ -60,9 +85,14 @@ echo -e "${GREEN}=========================================${NC}"
 echo -e "${GREEN}  All services started!${NC}"
 echo -e "${GREEN}=========================================${NC}"
 echo ""
-echo "  Backend:  http://localhost:8000"
-echo "  API Docs: http://localhost:8000/docs"
-echo "  Frontend: http://localhost:3000"
+echo "  Infrastructure (Docker):"
+echo "    Postgres: localhost:5433"
+echo "    Redis:    localhost:6380"
+echo ""
+echo "  Application (native):"
+echo "    Backend:  http://localhost:8000"
+echo "    API Docs: http://localhost:8000/docs"
+echo "    Frontend: http://localhost:3000"
 echo ""
 echo "  Run './scripts/stop-local.sh' to stop all services"
 echo ""
