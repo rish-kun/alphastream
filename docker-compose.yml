@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  alphastream-postgres:
+    image: postgres:16-alpine
+    container_name: alphastream-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: alphastream
+    ports:
+      - "5433:5432"
+    volumes:
+      - alphastream_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  alphastream-redis:
+    image: redis:7-alpine
+    container_name: alphastream-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - alphastream_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  alphastream_pgdata:
+  alphastream_redisdata:

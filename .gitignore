@@ -205,3 +205,57 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ===========================================
+# AlphaStream India - Additional Ignores
+# ===========================================
+
+# Node.js / Frontend
+node_modules/
+.next/
+out/
+frontend/.env.local
+frontend/.env
+
+# Bun
+bun.lock
+
+# Docker volumes (if mounted locally)
+docker-compose.override.yml
+pgdata/
+redisdata/
+
+# Local PID files
+.pids
+
+# Database dumps
+*.sql
+dump.rdb
+celerybeat-schedule*
+
+# ML Models (downloaded at runtime)
+models/
+*.bin
+*.safetensors
+*.onnx
+
+# spaCy models
+en_core_web_*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Coverage
+.coverage
+htmlcov/
