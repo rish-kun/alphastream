@@ -34,7 +34,7 @@ export function StockSearch({ onSelect, compact = false }: StockSearchProps) {
     isFetching,
   } = useQuery({
     queryKey: ["stocks", "search", debouncedQuery],
-    queryFn: () => searchStocks(debouncedQuery, 20),
+    queryFn: () => searchStocks(debouncedQuery),
     enabled: debouncedQuery.length >= 1,
     staleTime: 30 * 1000,
   });
@@ -45,7 +45,7 @@ export function StockSearch({ onSelect, compact = false }: StockSearchProps) {
     staleTime: 5 * 60 * 1000,
   });
 
-  const sectors = sectorsData?.sectors ?? [];
+  const sectors = sectorsData ?? [];
 
   const filteredStocks =
     sectorFilter === "all"
@@ -91,8 +91,8 @@ export function StockSearch({ onSelect, compact = false }: StockSearchProps) {
           <SelectContent>
             <SelectItem value="all">All Sectors</SelectItem>
             {sectors.map((sector) => (
-              <SelectItem key={sector.name} value={sector.name.toLowerCase()}>
-                {sector.name} ({sector.stock_count})
+              <SelectItem key={sector} value={sector.toLowerCase()}>
+                {sector}
               </SelectItem>
             ))}
           </SelectContent>

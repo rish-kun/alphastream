@@ -10,7 +10,7 @@ import {
 import {
   login as apiLogin,
   register as apiRegister,
-  getMe,
+  getCurrentUser,
 } from "@/lib/api";
 import {
   getAccessToken,
@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const token = getAccessToken();
     if (token) {
-      getMe()
+      getCurrentUser()
         .then(setUser)
         .catch(() => {
           clearTokens();

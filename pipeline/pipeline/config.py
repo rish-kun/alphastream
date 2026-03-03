@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -11,6 +12,28 @@ class PipelineSettings(BaseSettings):
     # API Keys
     GEMINI_API_KEYS: list[str] = []
     OPENROUTER_API_KEYS: list[str] = []
+
+    @field_validator("GEMINI_API_KEYS", "OPENROUTER_API_KEYS", mode="before")
+    @classmethod
+    def parse_api_keys(cls, v):
+        if isinstance(v, str):
+            if not v.strip():
+                return []
+            import json
+
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return [k.strip() for k in v.split(",") if k.strip()]
+        return v
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_database_url(cls, v: str) -> str:
+        """Force a sync Postgres driver for Celery/SQLAlchemy sync engine."""
+        if isinstance(v, str) and v.startswith("postgresql+asyncpg://"):
+            return v.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+        return v
 
     # Reddit
     REDDIT_CLIENT_ID: str = ""
@@ -38,7 +61,12 @@ class PipelineSettings(BaseSettings):
     LLM_REQUESTS_PER_MINUTE: int = 15
     RSS_FETCH_TIMEOUT: int = 30
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {
+        "env_file": "../.env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+        "enable_decoding": False,
+    }
 
 
 settings = PipelineSettings()

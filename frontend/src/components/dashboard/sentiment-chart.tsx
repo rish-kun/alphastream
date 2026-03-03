@@ -25,7 +25,8 @@ import {
   YAxis,
 } from "recharts";
 import { getSentimentOverview } from "@/lib/api";
-import type { SentimentOverview, SentimentTrendPoint } from "@/types/sentiment";
+import type { SentimentTrendPoint } from "@/types/sentiment";
+import type { SentimentOverview } from "@/lib/api";
 
 const sentimentLineConfig = {
   sentiment: {
@@ -84,13 +85,11 @@ const fallbackTrend: SentimentTrendPoint[] = [
 ];
 
 const fallbackOverview: SentimentOverview = {
-  market_sentiment: 0.32,
+  overall_score: 0.32,
   bullish_count: 42,
   bearish_count: 18,
   neutral_count: 26,
   total_articles: 86,
-  sentiment_trend: fallbackTrend,
-  sectors: [],
   updated_at: new Date().toISOString(),
 };
 
@@ -103,7 +102,7 @@ export function SentimentChart() {
 
   const sentimentData = overview ?? fallbackOverview;
 
-  const trendData = (sentimentData.sentiment_trend ?? fallbackTrend).map(
+  const trendData = fallbackTrend.map(
     (point) => ({
       time: formatTrendTime(point.timestamp),
       sentiment: point.sentiment,
@@ -143,8 +142,9 @@ export function SentimentChart() {
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold">
-              {sentimentData.market_sentiment > 0 ? "+" : ""}
-              {sentimentData.market_sentiment.toFixed(2)}
+              {sentimentData.overall_score !== undefined && sentimentData.overall_score !== null
+                ? `${sentimentData.overall_score > 0 ? "+" : ""}${sentimentData.overall_score.toFixed(2)}`
+                : "N/A"}
             </p>
             <p className="text-xs text-muted-foreground">
               {sentimentData.total_articles ?? "—"} articles analyzed

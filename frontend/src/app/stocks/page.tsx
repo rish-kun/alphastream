@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Building2, TrendingUp, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { getSectors, searchStocks } from "@/lib/api";
@@ -25,11 +24,11 @@ export default function StocksPage() {
   // Fetch some popular stocks (empty query returns popular/all)
   const { data: popularData, isLoading: isPopularLoading } = useQuery({
     queryKey: ["stocks", "popular"],
-    queryFn: () => searchStocks("", 6),
+    queryFn: () => searchStocks(""),
     staleTime: 2 * 60 * 1000,
   });
 
-  const sectors = sectorsData?.sectors ?? [];
+  const sectors = sectorsData ?? [];
   const popularStocks = popularData?.stocks ?? [];
 
   return (
@@ -64,19 +63,11 @@ export default function StocksPage() {
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {sectors.map((sector) => (
               <Card
-                key={sector.name}
+                key={sector}
                 className="transition-colors hover:bg-muted/50 cursor-default"
               >
                 <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold">{sector.name}</p>
-                    <Badge variant="secondary" className="text-xs">
-                      {sector.stock_count}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {sector.stock_count} stock{sector.stock_count !== 1 ? "s" : ""}
-                  </p>
+                  <p className="text-sm font-semibold">{sector}</p>
                 </CardContent>
               </Card>
             ))}

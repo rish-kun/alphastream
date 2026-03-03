@@ -109,7 +109,13 @@ export default function NewsPage() {
     };
   }, []);
 
-  const allArticles = data?.pages.flatMap((page) => page.items) ?? [];
+  const allArticles =
+    data?.pages
+      .flatMap((page) => page.items ?? [])
+      .filter(
+        (article): article is NonNullable<typeof article> =>
+          Boolean(article?.id)
+      ) ?? [];
   const totalArticles = data?.pages[0]?.total ?? 0;
 
   const handleTickerSearch = () => {
@@ -147,11 +153,16 @@ export default function NewsPage() {
                 ? Array.from({ length: 4 }).map((_, i) => (
                     <TrendingCardSkeleton key={i} />
                   ))
-                : trendingData?.articles?.map((article) => (
-                    <div key={article.id} className="w-[280px] shrink-0">
-                      <NewsCard article={article} variant="trending" />
-                    </div>
-                  ))}
+                : trendingData?.articles
+                    ?.filter(
+                      (article): article is NonNullable<typeof article> =>
+                        Boolean(article?.id)
+                    )
+                    .map((article) => (
+                      <div key={article.id} className="w-[280px] shrink-0">
+                        <NewsCard article={article} variant="trending" />
+                      </div>
+                    ))}
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>

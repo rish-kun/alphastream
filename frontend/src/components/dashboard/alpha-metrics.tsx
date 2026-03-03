@@ -25,9 +25,9 @@ import {
   BarChart3,
   Minus,
 } from "lucide-react";
-import { getSentimentOverview, getTopAlphaSignals } from "@/lib/api";
-import type { AlphaMetric, SentimentOverview } from "@/types/sentiment";
+import { getSentimentOverview, getTopAlphaSignals, type SentimentOverview, type TopAlphaSignal } from "@/lib/api";
 import type { SignalType } from "@/types/stock";
+
 
 // ─── Signal Helpers ──────────────────────────────────────────────────────────
 
@@ -75,7 +75,8 @@ function formatConviction(conviction: number): string {
   return `${(conviction * 100).toFixed(0)}%`;
 }
 
-function formatScore(score: number): string {
+function formatScore(score: number | undefined | null): string {
+  if (score === undefined || score === null) return "N/A";
   const sign = score > 0 ? "+" : "";
   return `${sign}${score.toFixed(2)}`;
 }
@@ -83,13 +84,11 @@ function formatScore(score: number): string {
 // ─── Summary Cards ───────────────────────────────────────────────────────────
 
 const fallbackOverview: SentimentOverview = {
-  market_sentiment: 0.32,
+  overall_score: 0.32,
   bullish_count: 42,
   bearish_count: 18,
   neutral_count: 26,
   total_articles: 86,
-  sentiment_trend: [],
-  sectors: [],
   updated_at: new Date().toISOString(),
 };
 
@@ -97,15 +96,15 @@ function SummaryCards({ overview }: { overview: SentimentOverview }) {
   const metrics = [
     {
       title: "Market Sentiment",
-      value: formatScore(overview.market_sentiment),
+      value: formatScore(overview.overall_score),
       description:
-        overview.market_sentiment > 0.2
+        overview.overall_score > 0.2
           ? "Moderately Bullish"
-          : overview.market_sentiment < -0.2
+          : overview.overall_score < -0.2
             ? "Moderately Bearish"
             : "Neutral",
       icon: Activity,
-      trend: overview.market_sentiment >= 0 ? ("up" as const) : ("down" as const),
+      trend: overview.overall_score >= 0 ? ("up" as const) : ("down" as const),
     },
     {
       title: "Total Articles",
@@ -150,7 +149,7 @@ function SummaryCards({ overview }: { overview: SentimentOverview }) {
 
 // ─── Alpha Signals Table ─────────────────────────────────────────────────────
 
-function AlphaSignalsTable({ signals }: { signals: AlphaMetric[] }) {
+function AlphaSignalsTable({ signals }: { signals: TopAlphaSignal[] }) {
   if (signals.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
@@ -169,24 +168,18 @@ function AlphaSignalsTable({ signals }: { signals: AlphaMetric[] }) {
           <TableHead>Signal</TableHead>
           <TableHead className="text-right">Score</TableHead>
           <TableHead className="text-right">Conviction</TableHead>
-          <TableHead className="hidden text-right md:table-cell">
-            Exp. Gap
-          </TableHead>
-          <TableHead className="hidden text-right lg:table-cell">
-            Narrative V.
-          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {signals.map((metric) => {
-          const info = getSignalInfo(metric.signal);
+          const info = getSignalInfo(metric.signal as SignalType);
           const SignalIcon = info.icon;
           return (
-            <TableRow key={metric.id}>
+            <TableRow key={metric.ticker}>
               <TableCell>
                 <div>
                   <p className="font-medium">
-                    {metric.ticker ?? metric.sector ?? "Market"}
+                    {metric.ticker ?? "Market"}
                   </p>
                   {metric.company_name && (
                     <p className="text-xs text-muted-foreground">
@@ -217,16 +210,6 @@ function AlphaSignalsTable({ signals }: { signals: AlphaMetric[] }) {
               <TableCell className="text-right">
                 <span className="font-mono text-sm">
                   {formatConviction(metric.conviction)}
-                </span>
-              </TableCell>
-              <TableCell className="hidden text-right md:table-cell">
-                <span className="font-mono text-sm text-muted-foreground">
-                  {formatScore(metric.expectation_gap)}
-                </span>
-              </TableCell>
-              <TableCell className="hidden text-right lg:table-cell">
-                <span className="font-mono text-sm text-muted-foreground">
-                  {formatScore(metric.narrative_velocity)}
                 </span>
               </TableCell>
             </TableRow>
@@ -297,7 +280,7 @@ export function AlphaMetrics() {
                 ))}
               </div>
             ) : (
-              <AlphaSignalsTable signals={signals ?? []} />
+              <AlphaSignalsTable signals={signals?.signals ?? []} />
             )}
           </CardContent>
         </Card>

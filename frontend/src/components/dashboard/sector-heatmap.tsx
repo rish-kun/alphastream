@@ -11,21 +11,20 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Grid3x3, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Grid3x3 } from "lucide-react";
 import { getSectorSentiment } from "@/lib/api";
-import type { SectorSentiment } from "@/types/sentiment";
-import type { SignalType } from "@/types/stock";
+import type { SectorSentiment } from "@/lib/api";
 
 // Fallback data
 const fallbackSectors: SectorSentiment[] = [
-  { sector: "Financial Services", sentiment_score: 0.45, news_count: 28, top_signal: "buy" as SignalType, change_24h: 0.08 },
-  { sector: "Technology", sentiment_score: -0.22, news_count: 19, top_signal: "hold" as SignalType, change_24h: -0.15 },
-  { sector: "Energy", sentiment_score: 0.61, news_count: 15, top_signal: "strong_buy" as SignalType, change_24h: 0.12 },
-  { sector: "FMCG", sentiment_score: 0.12, news_count: 11, top_signal: "hold" as SignalType, change_24h: 0.03 },
-  { sector: "Healthcare", sentiment_score: 0.33, news_count: 9, top_signal: "buy" as SignalType, change_24h: 0.05 },
-  { sector: "Telecom", sentiment_score: -0.08, news_count: 7, top_signal: "hold" as SignalType, change_24h: -0.02 },
-  { sector: "Automobiles", sentiment_score: 0.28, news_count: 12, top_signal: "buy" as SignalType, change_24h: 0.10 },
-  { sector: "Metals & Mining", sentiment_score: -0.35, news_count: 8, top_signal: "sell" as SignalType, change_24h: -0.18 },
+  { sector: "Financial Services", avg_sentiment: 0.45, article_count: 28, top_tickers: ["HDFC", "ICICI"] },
+  { sector: "Technology", avg_sentiment: -0.22, article_count: 19, top_tickers: ["TCS", "INFY"] },
+  { sector: "Energy", avg_sentiment: 0.61, article_count: 15, top_tickers: ["RELIANCE", "ONGC"] },
+  { sector: "FMCG", avg_sentiment: 0.12, article_count: 11, top_tickers: ["HUL", "ITC"] },
+  { sector: "Healthcare", avg_sentiment: 0.33, article_count: 9, top_tickers: ["SUNPHARMA", "CIPLA"] },
+  { sector: "Telecom", avg_sentiment: -0.08, article_count: 7, top_tickers: ["AIRTEL", "JIO"] },
+  { sector: "Automobiles", avg_sentiment: 0.28, article_count: 12, top_tickers: ["TATAMOTORS", "M&M"] },
+  { sector: "Metals & Mining", avg_sentiment: -0.35, article_count: 8, top_tickers: ["TATASTEEL", "COAL"] },
 ];
 
 function getSentimentColor(score: number): string {
@@ -49,48 +48,6 @@ function getSentimentBgIntensity(score: number): string {
     return "bg-red-500/5 border-red-500/10";
   }
   return "bg-yellow-500/5 border-yellow-500/10";
-}
-
-function getSignalBadgeVariant(
-  signal: SignalType
-): "default" | "secondary" | "destructive" | "outline" {
-  if (signal === "strong_buy" || signal === "buy") return "default";
-  if (signal === "strong_sell" || signal === "sell") return "destructive";
-  return "secondary";
-}
-
-function getSignalLabel(signal: SignalType): string {
-  const labels: Record<SignalType, string> = {
-    strong_buy: "Strong Buy",
-    buy: "Buy",
-    hold: "Hold",
-    sell: "Sell",
-    strong_sell: "Strong Sell",
-  };
-  return labels[signal] ?? signal;
-}
-
-function ChangeIndicator({ change }: { change: number }) {
-  if (change > 0.01) {
-    return (
-      <span className="flex items-center gap-0.5 text-xs text-green-600 dark:text-green-400">
-        <TrendingUp className="h-3 w-3" />+{(change * 100).toFixed(0)}%
-      </span>
-    );
-  }
-  if (change < -0.01) {
-    return (
-      <span className="flex items-center gap-0.5 text-xs text-red-600 dark:text-red-400">
-        <TrendingDown className="h-3 w-3" />
-        {(change * 100).toFixed(0)}%
-      </span>
-    );
-  }
-  return (
-    <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-      <Minus className="h-3 w-3" />0%
-    </span>
-  );
 }
 
 export function SectorHeatmap() {
@@ -136,7 +93,7 @@ export function SectorHeatmap() {
           {sectorData.map((sector) => (
             <div
               key={sector.sector}
-              className={`rounded-lg border p-3 transition-colors ${getSentimentBgIntensity(sector.sentiment_score)}`}
+              className={`rounded-lg border p-3 transition-colors ${getSentimentBgIntensity(sector.avg_sentiment)}`}
             >
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
@@ -144,30 +101,34 @@ export function SectorHeatmap() {
                     {sector.sector}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {sector.news_count} articles
+                    {sector.article_count} articles
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span
-                    className={`text-lg font-bold tabular-nums ${getSentimentColor(sector.sentiment_score)}`}
+                    className={`text-lg font-bold tabular-nums ${getSentimentColor(sector.avg_sentiment)}`}
                   >
-                    {sector.sentiment_score > 0 ? "+" : ""}
-                    {sector.sentiment_score.toFixed(2)}
+                    {sector.avg_sentiment > 0 ? "+" : ""}
+                    {sector.avg_sentiment.toFixed(2)}
                   </span>
-                  <ChangeIndicator change={sector.change_24h} />
                 </div>
               </div>
               <div className="mt-2 flex items-center justify-between">
                 <Progress
-                  value={((sector.sentiment_score + 1) / 2) * 100}
+                  value={((sector.avg_sentiment + 1) / 2) * 100}
                   className="h-1.5 flex-1 mr-2"
                 />
-                <Badge
-                  variant={getSignalBadgeVariant(sector.top_signal)}
-                  className="shrink-0 text-[10px] px-1.5 py-0"
-                >
-                  {getSignalLabel(sector.top_signal)}
-                </Badge>
+                <div className="flex gap-1">
+                  {sector.top_tickers.slice(0, 2).map((ticker) => (
+                    <Badge
+                      key={ticker}
+                      variant="secondary"
+                      className="shrink-0 text-[10px] px-1.5 py-0"
+                    >
+                      {ticker}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </div>
           ))}

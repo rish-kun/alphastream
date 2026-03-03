@@ -47,6 +47,16 @@ until docker inspect --format='{{.State.Health.Status}}' alphastream-redis 2>/de
 done
 echo -e "${GREEN}Redis is ready.${NC}"
 
+# ── Initialize database schema/data ────────────────────────────
+echo -e "${CYAN}Running database migrations...${NC}"
+cd "$PROJECT_DIR/backend"
+uv run alembic upgrade head
+echo -e "${GREEN}Migrations complete.${NC}"
+
+echo -e "${CYAN}Seeding stock data...${NC}"
+uv run python scripts/seed_stocks.py
+echo -e "${GREEN}Seed complete.${NC}"
+
 # ── Start application processes ─────────────────────────────────
 echo ""
 echo -e "${CYAN}Starting application processes...${NC}"

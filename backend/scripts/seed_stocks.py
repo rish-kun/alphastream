@@ -8,6 +8,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 from pathlib import Path
 
@@ -322,7 +323,7 @@ async def seed_stocks() -> None:
                 text(
                     """
                     INSERT INTO stocks (ticker, exchange, company_name, sector, industry, aliases)
-                    VALUES (:ticker, :exchange, :company_name, :sector, :industry, :aliases::jsonb)
+                    VALUES (:ticker, :exchange, :company_name, :sector, :industry, CAST(:aliases AS jsonb))
                     ON CONFLICT (ticker) DO NOTHING
                     RETURNING id
                     """
@@ -333,7 +334,7 @@ async def seed_stocks() -> None:
                     "company_name": company_name,
                     "sector": sector,
                     "industry": industry,
-                    "aliases": str(aliases).replace("'", '"'),
+                    "aliases": json.dumps(aliases),
                 },
             )
 

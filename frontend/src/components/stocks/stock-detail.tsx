@@ -33,7 +33,8 @@ import { formatDistanceToNow, format } from "date-fns";
 import { getStock, getStockNews, getStockAlpha } from "@/lib/api";
 import { useWebSocketSubscription } from "@/hooks/use-websocket";
 import { ResearchToggle } from "@/components/research/research-toggle";
-import type { SignalType, AlphaMetricEntry } from "@/types/stock";
+import type { SignalType } from "@/types/stock";
+import type { StockAlphaMetric } from "@/lib/api";
 
 interface StockDetailProps {
   ticker: string;
@@ -174,7 +175,7 @@ export function StockDetail({ ticker }: StockDetailProps) {
     queryClient.invalidateQueries({ queryKey: ["stock", ticker, "alpha"] });
   });
 
-  const latestAlpha: AlphaMetricEntry | null =
+  const latestAlpha: StockAlphaMetric | null =
     alphaData?.metrics?.[0] ?? null;
   const signalConfig = latestAlpha
     ? getSignalConfig(latestAlpha.signal)
@@ -465,12 +466,6 @@ export function StockDetail({ ticker }: StockDetailProps) {
                       <Progress value={latestAlpha.conviction} className="h-3" />
                     </div>
 
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Window</span>
-                      <span className="font-medium">
-                        {latestAlpha.window_hours}h
-                      </span>
-                    </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Computed</span>
                       <span className="font-medium">

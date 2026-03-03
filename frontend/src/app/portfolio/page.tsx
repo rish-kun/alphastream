@@ -60,7 +60,7 @@ export default function PortfolioPage() {
     enabled: !!user,
   });
 
-  const portfolios = (portfoliosData?.portfolios ?? []).filter(
+  const portfolios = (portfoliosData ?? []).filter(
     (p) => p.name !== "__watchlist__"
   );
 

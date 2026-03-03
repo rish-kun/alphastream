@@ -71,7 +71,7 @@ export function PortfolioManager() {
     queryFn: getPortfolios,
   });
 
-  const portfolios = portfoliosData?.portfolios ?? [];
+  const portfolios = portfoliosData ?? [];
 
   // Create portfolio mutation
   const createMutation = useMutation({

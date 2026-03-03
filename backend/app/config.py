@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file="../.env",
         env_file_encoding="utf-8",
         extra="ignore",
+        enable_decoding=False,
     )
 
     # Database
@@ -35,6 +37,20 @@ class Settings(BaseSettings):
     # AI API Keys
     GEMINI_API_KEYS: list[str] = []
     OPENROUTER_API_KEYS: list[str] = []
+
+    @field_validator("GEMINI_API_KEYS", "OPENROUTER_API_KEYS", mode="before")
+    @classmethod
+    def parse_api_keys(cls, v):
+        if isinstance(v, str):
+            if not v.strip():
+                return []
+            import json
+
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return [k.strip() for k in v.split(",") if k.strip()]
+        return v
 
     # Extensive Research
     FIRECRAWL_API_KEY: str = ""

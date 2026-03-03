@@ -55,7 +55,7 @@ export function Watchlist() {
     queryFn: getPortfolios,
   });
 
-  const portfolios = portfoliosData?.portfolios ?? [];
+  const portfolios = portfoliosData ?? [];
   const watchlist = portfolios.find((p) => p.name === WATCHLIST_NAME);
 
   // Fetch alpha metrics for watchlist stocks
