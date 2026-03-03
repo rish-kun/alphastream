@@ -45,7 +45,12 @@ class GeminiClient:
         """
         return self._key_rotator.get_next()
 
-    def analyze_sentiment(self, text: str, context: str = "") -> dict:
+    def analyze_sentiment(
+        self,
+        text: str,
+        context: str = "",
+        fail_silently: bool = True,
+    ) -> dict:
         """Analyze financial sentiment using Gemini.
 
         Args:
@@ -55,10 +60,14 @@ class GeminiClient:
         Returns:
             Dict with sentiment_score, confidence, explanation, and metadata.
         """
-        logger.info("Analyzing sentiment via Gemini (text length=%d)", len(text))
+        logger.info(
+            "Analyzing sentiment via Gemini (text length=%d)", len(text))
 
         if len(self._api_keys) == 0:
-            logger.warning("No Gemini API keys configured, returning placeholder")
+            if not fail_silently:
+                raise ValueError("No Gemini API keys configured")
+            logger.warning(
+                "No Gemini API keys configured, returning placeholder")
             return {
                 "sentiment_score": 0.0,
                 "confidence": 0.0,
@@ -86,12 +95,15 @@ class GeminiClient:
                 contents=prompt,
             )
 
-            result = self._normalize_response(self._parse_json_response(response.text))
+            result = self._normalize_response(
+                self._parse_json_response(response.text))
             logger.info("Gemini sentiment analysis completed successfully")
             return result
         except Exception as e:
             self._key_rotator.mark_failed(api_key)
             logger.error("Gemini API call failed: %s", str(e))
+            if not fail_silently:
+                raise
             return self._get_fallback_response(str(e))
 
     def _parse_json_response(self, response_text: str) -> dict:
@@ -123,7 +135,8 @@ class GeminiClient:
         Returns:
             Fallback dict with default values.
         """
-        logger.warning("Returning fallback sentiment response due to: %s", error)
+        logger.warning(
+            "Returning fallback sentiment response due to: %s", error)
         return {
             "sentiment_score": 0.0,
             "confidence": 0.0,
@@ -135,13 +148,15 @@ class GeminiClient:
         }
 
     def _normalize_response(self, result: dict) -> dict:
-        score = self._clamp(self._to_float(result.get("sentiment_score")), -1.0, 1.0)
+        score = self._clamp(self._to_float(
+            result.get("sentiment_score")), -1.0, 1.0)
         confidence = self._clamp(
             self._to_float(result.get("confidence")),
             0.0,
             1.0,
         )
-        timeline = str(result.get("impact_timeline") or "unknown").strip().lower()
+        timeline = str(result.get("impact_timeline")
+                       or "unknown").strip().lower()
         if timeline not in {"immediate", "short_term", "long_term"}:
             timeline = "unknown"
         return {

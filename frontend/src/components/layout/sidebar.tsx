@@ -10,6 +10,7 @@ import {
   Settings,
   TrendingUp,
 } from "lucide-react";
+import { ReanalyzeAllButton } from "@/components/sentiment/reanalyze-all-button";
 import {
   Sidebar,
   SidebarContent,
@@ -31,9 +32,7 @@ const navItems = [
   { title: "Portfolio", href: "/portfolio", icon: Briefcase },
 ];
 
-const bottomItems = [
-  { title: "Settings", href: "/settings", icon: Settings },
-];
+const bottomItems = [{ title: "Settings", href: "/settings", icon: Settings }];
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -45,7 +44,9 @@ export function AppSidebar() {
           <TrendingUp className="h-6 w-6 text-primary" />
           <span className="text-lg font-bold">AlphaStream</span>
         </Link>
-        <p className="text-xs text-muted-foreground">Indian Market Intelligence</p>
+        <p className="text-xs text-muted-foreground">
+          Indian Market Intelligence
+        </p>
       </SidebarHeader>
 
       <SidebarSeparator />
@@ -76,6 +77,9 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <ReanalyzeAllButton />
+          </SidebarMenuItem>
           {bottomItems.map((item) => (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton

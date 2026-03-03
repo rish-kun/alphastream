@@ -58,6 +58,18 @@ class PipelineSettings(BaseSettings):
             return [str(item).strip().lower() for item in v if str(item).strip()]
         return ["gemini", "openrouter"]
 
+    @field_validator(
+        "SENTIMENT_LOCAL_WEIGHT",
+        "SENTIMENT_GEMINI_WEIGHT",
+        "SENTIMENT_OPENROUTER_WEIGHT",
+        mode="after",
+    )
+    @classmethod
+    def validate_non_negative_weight(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("Sentiment weights must be non-negative")
+        return v
+
     # Reddit
     REDDIT_CLIENT_ID: str = ""
     REDDIT_CLIENT_SECRET: str = ""
@@ -74,19 +86,28 @@ class PipelineSettings(BaseSettings):
     FINBERT_MODEL: str = "ProsusAI/finbert"
     SPACY_MODEL: str = "en_core_web_sm"
     SENTIMENT_FINBERT_MODEL: str = "ProsusAI/finbert"
-    SENTIMENT_GEMINI_MODEL: str = "gemini-3-flash-preview"
-    SENTIMENT_OPENROUTER_MODEL: str = "stepfun/step-3.5-flash:free"
+    SENTIMENT_GEMINI_MODEL: str = "gemini-flash-latest"
+    SENTIMENT_GEMINI_FALLBACK_MODEL: str = "gemini-flash-lite-latest"
+    SENTIMENT_OPENROUTER_MODEL: str = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+    SENTIMENT_OPENROUTER_FALLBACK_MODEL: str = "arcee-ai/trinity-large-preview:free"
+    SENTIMENT_LLM_FALLBACK_RETRIES: int = 3
     SENTIMENT_LLM_PROVIDER_ORDER: list[str] = ["gemini", "openrouter"]
     SENTIMENT_FINBERT_MAX_CHARS: int = 3000
     SENTIMENT_FINBERT_MAX_CHUNKS: int = 3
     SENTIMENT_LLM_MAX_CHARS: int = 2200
     SENTIMENT_LLM_TRIGGER_CONFIDENCE: float = 0.70
     SENTIMENT_LLM_TRIGGER_NEUTRAL_BAND: float = 0.20
-    SENTIMENT_LOCAL_WEIGHT: float = 0.65
+    SENTIMENT_LOCAL_WEIGHT: float = 0.30
+    SENTIMENT_GEMINI_WEIGHT: float = 0.40
+    SENTIMENT_OPENROUTER_WEIGHT: float = 0.30
     SENTIMENT_LLM_WEIGHT: float = 0.35
     SENTIMENT_ENABLE_LLM: bool = True
+    SENTIMENT_ALWAYS_USE_LLM: bool = True
     SENTIMENT_PENDING_BATCH_SIZE: int = 50
     SENTIMENT_REANALYZE_BATCH_LIMIT: int = 100
+    SENTIMENT_REANALYZE_ALL_BATCH_SIZE: int = 50
+    SENTIMENT_REANALYZE_ALL_BATCH_DELAY_SECONDS: int = 15
+    SENTIMENT_REANALYZE_ALL_MAX_ARTICLES: int = 5000
 
     # Extensive Research API Keys
     FIRECRAWL_API_KEY: str = ""
@@ -108,3 +129,15 @@ class PipelineSettings(BaseSettings):
 
 
 settings = PipelineSettings()
+
+# Validate configured weight split once settings are loaded.
+_weight_sum = (
+    settings.SENTIMENT_LOCAL_WEIGHT
+    + settings.SENTIMENT_GEMINI_WEIGHT
+    + settings.SENTIMENT_OPENROUTER_WEIGHT
+)
+if abs(_weight_sum - 1.0) > 1e-6:
+    raise ValueError(
+        "SENTIMENT_LOCAL_WEIGHT + SENTIMENT_GEMINI_WEIGHT + "
+        "SENTIMENT_OPENROUTER_WEIGHT must equal 1.0"
+    )

@@ -104,7 +104,8 @@ class TestSentimentReanalysis:
 
             resp = await client.post(
                 "/api/v1/sentiment/reanalyze",
-                json={"article_ids": [str(article_id)], "force_reanalyze": True},
+                json={"article_ids": [str(article_id)],
+                      "force_reanalyze": True},
             )
 
         assert resp.status_code == 202
@@ -122,7 +123,8 @@ class TestSentimentReanalysis:
         with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task:
             resp = await client.post(
                 "/api/v1/sentiment/reanalyze",
-                json={"article_ids": [str(article_id)], "force_reanalyze": True},
+                json={"article_ids": [str(article_id)],
+                      "force_reanalyze": True},
             )
 
         assert resp.status_code == 202
@@ -131,3 +133,45 @@ class TestSentimentReanalysis:
         assert data["task_ids"] == []
         assert data["skipped_article_ids"] == [str(article_id)]
         mock_send_task.assert_not_called()
+
+    async def test_reanalyze_all_dispatches_job(self, client: AsyncClient):
+        with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task:
+            mock_send_task.return_value = MagicMock(id="bulk-task-1")
+
+            resp = await client.post(
+                "/api/v1/sentiment/reanalyze-all",
+                json={"force_reanalyze": True, "batch_size": 25},
+            )
+
+        assert resp.status_code == 202
+        data = resp.json()
+        assert data["task_id"] == "bulk-task-1"
+        assert data["status"] == "dispatched"
+
+    async def test_reanalyze_all_status_progress(self, client: AsyncClient):
+        mock_result = MagicMock()
+        mock_result.state = "PROGRESS"
+        mock_result.info = {"dispatched": 20, "targeted_articles": 100}
+
+        with patch("app.api.v1.sentiment._celery_app.AsyncResult") as mock_async_result:
+            mock_async_result.return_value = mock_result
+            resp = await client.get("/api/v1/sentiment/reanalyze-all/status/job-1")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "PROGRESS"
+        assert data["progress"]["dispatched"] == 20
+
+    async def test_reanalyze_all_status_failure(self, client: AsyncClient):
+        mock_result = MagicMock()
+        mock_result.state = "FAILURE"
+        mock_result.info = RuntimeError("boom")
+
+        with patch("app.api.v1.sentiment._celery_app.AsyncResult") as mock_async_result:
+            mock_async_result.return_value = mock_result
+            resp = await client.get("/api/v1/sentiment/reanalyze-all/status/job-2")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "FAILURE"
+        assert "boom" in data["error"]

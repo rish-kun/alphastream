@@ -55,7 +55,6 @@ def scrape_article(self, article_id: str, url: str) -> dict:
     Returns:
         Dict with article ID, URL, and extraction status.
     """
-    from pipeline.tasks.sentiment_analysis import analyze_article as sentiment_task
     from pipeline.tasks.ticker_identification import identify_tickers as ticker_task
 
     logger.info("Scraping article %s: %s", article_id, url)
@@ -81,7 +80,6 @@ def scrape_article(self, article_id: str, url: str) -> dict:
                 {"full_text": cleaned_text, "id": article_id},
             )
 
-        sentiment_task.delay(article_id)
         ticker_task.delay(article_id)
 
         logger.info("Article scrape complete: %s", article_id)

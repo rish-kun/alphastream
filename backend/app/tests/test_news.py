@@ -168,3 +168,9 @@ class TestGetArticle:
     async def test_invalid_uuid(self, client: AsyncClient):
         resp = await client.get("/api/v1/news/not-a-uuid")
         assert resp.status_code == 422
+
+
+class TestNewsAuth:
+    async def test_news_requires_auth(self, unauthed_client: AsyncClient):
+        resp = await unauthed_client.get("/api/v1/news/")
+        assert resp.status_code == 401

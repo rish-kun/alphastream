@@ -35,7 +35,8 @@ class OpenRouterClient:
         self._api_keys = api_keys
         self._model_name = model_name or settings.SENTIMENT_OPENROUTER_MODEL
         self._max_input_chars = max_input_chars or settings.SENTIMENT_LLM_MAX_CHARS
-        logger.info("OpenRouterClient initialized with %d API keys", len(api_keys))
+        logger.info(
+            "OpenRouterClient initialized with %d API keys", len(api_keys))
 
     def _rotate_key(self) -> str:
         """Get the next available API key.
@@ -45,7 +46,12 @@ class OpenRouterClient:
         """
         return self._key_rotator.get_next()
 
-    def analyze_sentiment(self, text: str, context: str = "") -> dict:
+    def analyze_sentiment(
+        self,
+        text: str,
+        context: str = "",
+        fail_silently: bool = True,
+    ) -> dict:
         """Analyze financial sentiment using OpenRouter.
 
         Args:
@@ -55,10 +61,14 @@ class OpenRouterClient:
         Returns:
             Dict with sentiment_score, confidence, explanation, and metadata.
         """
-        logger.info("Analyzing sentiment via OpenRouter (text length=%d)", len(text))
+        logger.info(
+            "Analyzing sentiment via OpenRouter (text length=%d)", len(text))
 
         if len(self._api_keys) == 0:
-            logger.warning("No OpenRouter API keys configured, returning placeholder")
+            if not fail_silently:
+                raise ValueError("No OpenRouter API keys configured")
+            logger.warning(
+                "No OpenRouter API keys configured, returning placeholder")
             return {
                 "sentiment_score": 0.0,
                 "confidence": 0.0,
@@ -75,7 +85,8 @@ class OpenRouterClient:
         try:
             from openai import OpenAI
 
-            client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
+            client = OpenAI(
+                base_url="https://openrouter.ai/api/v1", api_key=api_key)
             from pipeline.llm.prompts import SENTIMENT_ANALYSIS_PROMPT
 
             prompt = SENTIMENT_ANALYSIS_PROMPT.format(
@@ -94,6 +105,8 @@ class OpenRouterClient:
         except Exception as e:
             self._key_rotator.mark_failed(api_key)
             logger.error("OpenRouter API call failed: %s", str(e))
+            if not fail_silently:
+                raise
             return self._get_fallback_response(str(e))
 
     def _parse_json_response(self, response_text: str) -> dict:
@@ -125,7 +138,8 @@ class OpenRouterClient:
         Returns:
             Fallback dict with default values.
         """
-        logger.warning("Returning fallback sentiment response due to: %s", error)
+        logger.warning(
+            "Returning fallback sentiment response due to: %s", error)
         return {
             "sentiment_score": 0.0,
             "confidence": 0.0,
@@ -137,13 +151,15 @@ class OpenRouterClient:
         }
 
     def _normalize_response(self, result: dict) -> dict:
-        score = self._clamp(self._to_float(result.get("sentiment_score")), -1.0, 1.0)
+        score = self._clamp(self._to_float(
+            result.get("sentiment_score")), -1.0, 1.0)
         confidence = self._clamp(
             self._to_float(result.get("confidence")),
             0.0,
             1.0,
         )
-        timeline = str(result.get("impact_timeline") or "unknown").strip().lower()
+        timeline = str(result.get("impact_timeline")
+                       or "unknown").strip().lower()
         if timeline not in {"immediate", "short_term", "long_term"}:
             timeline = "unknown"
         return {

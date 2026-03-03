@@ -8,6 +8,7 @@ import {
   useState,
   useCallback,
 } from "react";
+import { useSession } from "next-auth/react";
 import { WebSocketClient } from "@/lib/ws";
 
 interface WebSocketMessage {
@@ -29,19 +30,20 @@ const WebSocketContext = createContext<WebSocketContextType>({
   sendMessage: () => {},
 });
 
-export function WebSocketProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function WebSocketProvider({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
   const clientRef = useRef<WebSocketClient | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(
-    null
-  );
+  const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
 
   useEffect(() => {
-    const client = new WebSocketClient("/ws/feed");
+    if (status !== "authenticated") {
+      return;
+    }
+
+    const accessToken = (session as unknown as Record<string, unknown> | null)
+      ?.accessToken as string | undefined;
+    const client = new WebSocketClient("/ws/feed", accessToken ?? null);
 
     client.onConnect(() => {
       setIsConnected(true);
@@ -61,8 +63,9 @@ export function WebSocketProvider({
     return () => {
       client.disconnect();
       clientRef.current = null;
+      setIsConnected(false);
     };
-  }, []);
+  }, [session, status]);
 
   const sendMessage = useCallback((data: unknown) => {
     clientRef.current?.send(data);

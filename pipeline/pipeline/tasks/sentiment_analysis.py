@@ -2,6 +2,7 @@
 
 import json
 import logging
+from math import ceil
 from typing import Any
 
 from celery import Task
@@ -58,68 +59,106 @@ def _build_analysis_text(title: str, full_text: str) -> str:
     return f"Headline: {cleaned_title}\n\nArticle: {cleaned_body}"
 
 
-def _run_llm_analysis(text_body: str, source: str) -> tuple[dict | None, str | None]:
+def _run_all_llm_analyses(
+    text_body: str,
+    source: str,
+) -> tuple[dict[str, dict], dict[str, str]]:
+    """Run all configured LLM providers and collect successful responses."""
     if not _has_llm_keys():
-        return None, None
+        return {}, {}
 
-    provider_order = settings.SENTIMENT_LLM_PROVIDER_ORDER or ["gemini", "openrouter"]
+    results: dict[str, dict] = {}
+    failures: dict[str, str] = {}
+    provider_order = settings.SENTIMENT_LLM_PROVIDER_ORDER or [
+        "gemini", "openrouter"]
     context = f"source: {source}"
+
+    def _attempt_with_fallback_models(provider_name: str) -> tuple[dict | None, str | None]:
+        retries = max(0, settings.SENTIMENT_LLM_FALLBACK_RETRIES)
+
+        if provider_name == "gemini":
+            if not settings.GEMINI_API_KEYS:
+                return None, "missing_api_keys"
+            from pipeline.llm.gemini_client import GeminiClient
+
+            client_cls = GeminiClient
+            api_keys = settings.GEMINI_API_KEYS
+            primary_model = settings.SENTIMENT_GEMINI_MODEL
+            fallback_model = settings.SENTIMENT_GEMINI_FALLBACK_MODEL
+        elif provider_name == "openrouter":
+            if not settings.OPENROUTER_API_KEYS:
+                return None, "missing_api_keys"
+            from pipeline.llm.openrouter_client import OpenRouterClient
+
+            client_cls = OpenRouterClient
+            api_keys = settings.OPENROUTER_API_KEYS
+            primary_model = settings.SENTIMENT_OPENROUTER_MODEL
+            fallback_model = settings.SENTIMENT_OPENROUTER_FALLBACK_MODEL
+        else:
+            return None, "unsupported_provider"
+
+        attempts = [primary_model] + [fallback_model] * retries
+        attempt_errors: list[str] = []
+
+        for attempt_idx, model_name in enumerate(attempts, start=1):
+            try:
+                client = client_cls(api_keys=api_keys, model_name=model_name)
+                result = client.analyze_sentiment(
+                    text_body,
+                    context=context,
+                    fail_silently=False,
+                )
+                return result, None
+            except Exception as exc:
+                failure_msg = f"attempt={attempt_idx};model={model_name};error={exc}"
+                attempt_errors.append(failure_msg)
+                logger.warning(
+                    "%s sentiment attempt failed (%d/%d): %s",
+                    provider_name,
+                    attempt_idx,
+                    len(attempts),
+                    exc,
+                    exc_info=True,
+                )
+
+        return None, " | ".join(attempt_errors) if attempt_errors else "unknown_error"
 
     for provider in provider_order:
         provider = provider.lower().strip()
-        if provider == "gemini" and settings.GEMINI_API_KEYS:
-            try:
-                from pipeline.llm.gemini_client import GeminiClient
+        result, failure = _attempt_with_fallback_models(provider)
+        if result is not None:
+            results[provider] = result
+        else:
+            failures[provider] = failure or "unknown_error"
 
-                client = GeminiClient(settings.GEMINI_API_KEYS)
-                result = client.analyze_sentiment(text_body, context=context)
-                return result, "gemini"
-            except Exception:
-                logger.warning("Gemini analysis failed", exc_info=True)
-                continue
-        if provider == "openrouter" and settings.OPENROUTER_API_KEYS:
-            try:
-                from pipeline.llm.openrouter_client import OpenRouterClient
-
-                client = OpenRouterClient(settings.OPENROUTER_API_KEYS)
-                result = client.analyze_sentiment(text_body, context=context)
-                return result, "openrouter"
-            except Exception:
-                logger.warning("OpenRouter analysis failed", exc_info=True)
-                continue
-
-    return None, None
+    return results, failures
 
 
-def _combine_scores(
-    finbert_score: float,
-    finbert_confidence: float,
-    llm_score: float | None,
-    llm_confidence: float | None,
-) -> tuple[float, float]:
-    if llm_score is None:
-        return (
-            _clamp(finbert_score, -1.0, 1.0),
-            _clamp(finbert_confidence, 0.0, 1.0),
-        )
+def _combine_weighted_scores(scores: dict[str, float], confidences: dict[str, float]) -> tuple[float, float]:
+    """Combine scores from available models with normalized configured weights."""
+    configured_weights = {
+        "local": settings.SENTIMENT_LOCAL_WEIGHT,
+        "gemini": settings.SENTIMENT_GEMINI_WEIGHT,
+        "openrouter": settings.SENTIMENT_OPENROUTER_WEIGHT,
+    }
 
-    llm_conf = _clamp(llm_confidence or 0.0, 0.0, 1.0)
-    fin_conf = _clamp(finbert_confidence, 0.0, 1.0)
-
-    local_weight = settings.SENTIMENT_LOCAL_WEIGHT * max(fin_conf, 0.10)
-    llm_weight = settings.SENTIMENT_LLM_WEIGHT * max(llm_conf, 0.10)
-    total = local_weight + llm_weight
-
-    if total <= 0:
+    available = [model for model in scores if model in configured_weights]
+    if not available:
         return 0.0, 0.0
 
-    score = ((finbert_score * local_weight) + (llm_score * llm_weight)) / total
-    confidence = (
-        (fin_conf * settings.SENTIMENT_LOCAL_WEIGHT)
-        + (llm_conf * settings.SENTIMENT_LLM_WEIGHT)
-    ) / max(settings.SENTIMENT_LOCAL_WEIGHT + settings.SENTIMENT_LLM_WEIGHT, 1e-6)
+    base_weight_sum = sum(configured_weights[model] for model in available)
+    if base_weight_sum <= 0:
+        return 0.0, 0.0
 
-    return _clamp(score, -1.0, 1.0), _clamp(confidence, 0.0, 1.0)
+    weighted_sum = 0.0
+    confidence_sum = 0.0
+    for model in available:
+        normalized_weight = configured_weights[model] / base_weight_sum
+        model_confidence = _clamp(confidences.get(model, 0.0), 0.0, 1.0)
+        weighted_sum += _clamp(scores[model], -1.0, 1.0) * normalized_weight
+        confidence_sum += model_confidence * normalized_weight
+
+    return _clamp(weighted_sum, -1.0, 1.0), _clamp(confidence_sum, 0.0, 1.0)
 
 
 @app.task(name="pipeline.tasks.sentiment_analysis.analyze_pending")
@@ -148,7 +187,8 @@ def analyze_pending() -> dict:
         analyze_article.delay(str(row.id))
         count += 1
 
-    logger.info("Sentiment analysis dispatch complete: %d articles dispatched", count)
+    logger.info(
+        "Sentiment analysis dispatch complete: %d articles dispatched", count)
     return {"articles_dispatched": count}
 
 
@@ -209,32 +249,95 @@ def analyze_article(self: Task, article_id: str, force_reanalyze: bool = False) 
         1.0,
     )
 
-    llm_result = None
-    llm_provider = None
-    llm_score = None
-    llm_confidence = None
+    llm_results: dict[str, dict] = {}
+    llm_failures: dict[str, str] = {}
+    gemini_score = None
+    openrouter_score = None
+    gemini_confidence = None
+    openrouter_confidence = None
 
-    if _should_use_llm(finbert_score, finbert_confidence):
+    should_run_llm = (
+        settings.SENTIMENT_ENABLE_LLM
+        and _has_llm_keys()
+        and (
+            force_reanalyze
+            or settings.SENTIMENT_ALWAYS_USE_LLM
+            or _should_use_llm(finbert_score, finbert_confidence)
+        )
+    )
+
+    if should_run_llm:
         llm_input = analysis_text[: settings.SENTIMENT_LLM_MAX_CHARS]
-        llm_result, llm_provider = _run_llm_analysis(llm_input, source=source)
-        if llm_result:
-            llm_score = _clamp(_to_float(llm_result.get("sentiment_score")), -1.0, 1.0)
-            llm_confidence = _clamp(
-                _to_float(llm_result.get("confidence")),
+        llm_results, llm_failures = _run_all_llm_analyses(
+            llm_input, source=source)
+        if "gemini" in llm_results:
+            gemini_score = _clamp(
+                _to_float(llm_results["gemini"].get("sentiment_score")),
+                -1.0,
+                1.0,
+            )
+            gemini_confidence = _clamp(
+                _to_float(llm_results["gemini"].get("confidence")),
+                0.0,
+                1.0,
+            )
+        if "openrouter" in llm_results:
+            openrouter_score = _clamp(
+                _to_float(llm_results["openrouter"].get("sentiment_score")),
+                -1.0,
+                1.0,
+            )
+            openrouter_confidence = _clamp(
+                _to_float(llm_results["openrouter"].get("confidence")),
                 0.0,
                 1.0,
             )
 
-    ensemble_score, confidence = _combine_scores(
-        finbert_score=finbert_score,
-        finbert_confidence=finbert_confidence,
-        llm_score=llm_score,
-        llm_confidence=llm_confidence,
-    )
+    scores = {"local": finbert_score}
+    confidences = {"local": finbert_confidence}
+    if gemini_score is not None:
+        scores["gemini"] = gemini_score
+        confidences["gemini"] = gemini_confidence or 0.0
+    if openrouter_score is not None:
+        scores["openrouter"] = openrouter_score
+        confidences["openrouter"] = openrouter_confidence or 0.0
 
-    if llm_result:
-        explanation = llm_result.get("explanation") or "LLM-augmented sentiment analysis"
-        impact_timeline = llm_result.get("impact_timeline") or "unknown"
+    ensemble_score, confidence = _combine_weighted_scores(
+        scores=scores, confidences=confidences)
+
+    blended_llm_score = None
+    llm_provider = None
+    llm_confidence = None
+    if gemini_score is not None and openrouter_score is not None:
+        blended_llm_score, llm_confidence = _combine_weighted_scores(
+            scores={"gemini": gemini_score, "openrouter": openrouter_score},
+            confidences={
+                "gemini": gemini_confidence or 0.0,
+                "openrouter": openrouter_confidence or 0.0,
+            },
+        )
+        llm_provider = "ensemble"
+    elif gemini_score is not None:
+        blended_llm_score = gemini_score
+        llm_provider = "gemini"
+        llm_confidence = gemini_confidence
+    elif openrouter_score is not None:
+        blended_llm_score = openrouter_score
+        llm_provider = "openrouter"
+        llm_confidence = openrouter_confidence
+
+    if llm_results:
+        # Favor Gemini explanation when available, then OpenRouter.
+        explanation = (
+            llm_results.get("gemini", {}).get("explanation")
+            or llm_results.get("openrouter", {}).get("explanation")
+            or "Multi-model sentiment analysis"
+        )
+        impact_timeline = (
+            llm_results.get("gemini", {}).get("impact_timeline")
+            or llm_results.get("openrouter", {}).get("impact_timeline")
+            or "unknown"
+        )
     else:
         label = finbert_result.get("label", "neutral")
         explanation = (
@@ -245,10 +348,17 @@ def analyze_article(self: Task, article_id: str, force_reanalyze: bool = False) 
 
     raw_payload = {
         "finbert": finbert_result,
-        "llm": llm_result,
+        "llm": llm_results,
+        "weights": {
+            "local": settings.SENTIMENT_LOCAL_WEIGHT,
+            "gemini": settings.SENTIMENT_GEMINI_WEIGHT,
+            "openrouter": settings.SENTIMENT_OPENROUTER_WEIGHT,
+        },
         "metadata": {
-            "llm_used": bool(llm_result),
+            "llm_used": bool(llm_results),
             "llm_provider": llm_provider,
+            "llm_failures": llm_failures,
+            "llm_confidence": llm_confidence,
             "force_reanalyze": force_reanalyze,
         },
     }
@@ -278,7 +388,7 @@ def analyze_article(self: Task, article_id: str, force_reanalyze: bool = False) 
                     "explanation": explanation,
                     "impact_timeline": impact_timeline,
                     "finbert_score": finbert_score,
-                    "llm_score": llm_score,
+                    "llm_score": blended_llm_score,
                     "llm_provider": llm_provider,
                     "raw_response": json.dumps(raw_payload),
                 },
@@ -295,17 +405,102 @@ def analyze_article(self: Task, article_id: str, force_reanalyze: bool = False) 
                 explanation=explanation,
             )
         except Exception:
-            logger.debug("Failed to publish sentiment update for %s", article_id)
+            logger.debug(
+                "Failed to publish sentiment update for %s", article_id)
 
         return {
             "article_id": article_id,
             "status": "success",
             "finbert_score": finbert_score,
-            "llm_score": llm_score,
+            "llm_score": blended_llm_score,
             "ensemble_score": ensemble_score,
             "confidence": confidence,
             "llm_provider": llm_provider,
         }
     except Exception as exc:
-        logger.error("Failed to save sentiment analysis for %s: %s", article_id, exc)
+        logger.error(
+            "Failed to save sentiment analysis for %s: %s", article_id, exc)
         raise self.retry(exc=exc)
+
+
+@app.task(name="pipeline.tasks.sentiment_analysis.reanalyze_all", bind=True)
+def reanalyze_all(
+    self: Task,
+    force_reanalyze: bool = True,
+    batch_size: int | None = None,
+    batch_delay_seconds: int | None = None,
+    max_articles: int | None = None,
+) -> dict:
+    """Queue re-analysis for all articles in throttled batches."""
+    if not check_schema_ready():
+        return {"status": "skipped", "reason": "database schema not ready"}
+
+    effective_batch_size = max(
+        1, batch_size or settings.SENTIMENT_REANALYZE_ALL_BATCH_SIZE)
+    effective_batch_delay = max(
+        0,
+        batch_delay_seconds or settings.SENTIMENT_REANALYZE_ALL_BATCH_DELAY_SECONDS,
+    )
+    effective_max_articles = max_articles or settings.SENTIMENT_REANALYZE_ALL_MAX_ARTICLES
+
+    with get_db() as db:
+        total_result = db.execute(
+            text("SELECT COUNT(*) FROM news_articles"),
+        )
+        total_articles = int(total_result.scalar_one() or 0)
+
+        rows = db.execute(
+            text(
+                """
+                SELECT id
+                FROM news_articles
+                ORDER BY published_at DESC NULLS LAST
+                LIMIT :max_articles
+                """
+            ),
+            {"max_articles": effective_max_articles},
+        ).fetchall()
+
+    to_dispatch = len(rows)
+    if to_dispatch == 0:
+        return {
+            "status": "success",
+            "total_articles": total_articles,
+            "targeted_articles": 0,
+            "dispatched": 0,
+            "batch_size": effective_batch_size,
+            "batch_delay_seconds": effective_batch_delay,
+        }
+
+    dispatched = 0
+    for index, row in enumerate(rows):
+        countdown = (index // effective_batch_size) * effective_batch_delay
+        analyze_article.apply_async(
+            args=[str(row.id)],
+            kwargs={"force_reanalyze": force_reanalyze},
+            countdown=countdown,
+        )
+        dispatched += 1
+
+        if dispatched % effective_batch_size == 0 or dispatched == to_dispatch:
+            self.update_state(
+                state="PROGRESS",
+                meta={
+                    "total_articles": total_articles,
+                    "targeted_articles": to_dispatch,
+                    "dispatched": dispatched,
+                    "batch_size": effective_batch_size,
+                    "batch_delay_seconds": effective_batch_delay,
+                    "queued_batches": ceil(dispatched / effective_batch_size),
+                },
+            )
+
+    return {
+        "status": "success",
+        "total_articles": total_articles,
+        "targeted_articles": to_dispatch,
+        "dispatched": dispatched,
+        "batch_size": effective_batch_size,
+        "batch_delay_seconds": effective_batch_delay,
+        "queued_batches": ceil(to_dispatch / effective_batch_size),
+    }

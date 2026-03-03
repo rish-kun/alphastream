@@ -14,10 +14,10 @@ from app.models.user import User
 
 async def get_current_user(
     db: Annotated[AsyncSession, Depends(get_db)],
-    authorization: Annotated[str, Header()],
+    authorization: Annotated[str | None, Header()] = None,
 ) -> User:
     """Extract and validate JWT token, return the current user."""
-    if not authorization.startswith("Bearer "):
+    if not authorization or not authorization.startswith("Bearer "):
         raise UnauthorizedError("Invalid authorization header")
 
     token = authorization.removeprefix("Bearer ")

@@ -43,6 +43,27 @@ class SentimentReanalysisResponse(BaseModel):
     skipped_article_ids: list[uuid.UUID]
 
 
+class SentimentReanalyzeAllRequest(BaseModel):
+    force_reanalyze: bool = True
+    batch_size: int | None = Field(default=None, ge=1, le=500)
+    batch_delay_seconds: int | None = Field(default=None, ge=0, le=300)
+    max_articles: int | None = Field(default=None, ge=1, le=50000)
+
+
+class SentimentReanalyzeAllResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str
+
+
+class SentimentTaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    progress: dict | None = None
+    result: dict | None = None
+    error: str | None = None
+
+
 @router.get("/overview", response_model=SentimentOverview)
 async def get_market_sentiment(
     db: Annotated[AsyncSession, Depends(get_db)] = None,
@@ -241,7 +262,8 @@ async def reanalyze_articles_sentiment(
     existing_rows = await db.execute(
         select(NewsArticle.id).where(NewsArticle.id.in_(body.article_ids))
     )
-    existing_ids = {str(article_id) for article_id in existing_rows.scalars().all()}
+    existing_ids = {str(article_id)
+                    for article_id in existing_rows.scalars().all()}
 
     task_ids: list[str] = []
     skipped: list[uuid.UUID] = []
@@ -263,4 +285,71 @@ async def reanalyze_articles_sentiment(
         dispatched=len(task_ids),
         task_ids=task_ids,
         skipped_article_ids=skipped,
+    )
+
+
+@router.post(
+    "/reanalyze-all",
+    response_model=SentimentReanalyzeAllResponse,
+    status_code=202,
+)
+async def reanalyze_all_sentiment(
+    body: SentimentReanalyzeAllRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> SentimentReanalyzeAllResponse:
+    task = _celery_app.send_task(
+        "pipeline.tasks.sentiment_analysis.reanalyze_all",
+        kwargs={
+            "force_reanalyze": body.force_reanalyze,
+            "batch_size": body.batch_size,
+            "batch_delay_seconds": body.batch_delay_seconds,
+            "max_articles": body.max_articles,
+        },
+    )
+    return SentimentReanalyzeAllResponse(
+        task_id=task.id,
+        status="dispatched",
+        message="Reanalysis job dispatched for all articles",
+    )
+
+
+@router.get(
+    "/reanalyze-all/status/{task_id}",
+    response_model=SentimentTaskStatusResponse,
+)
+async def get_reanalyze_all_status(
+    task_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> SentimentTaskStatusResponse:
+    result = _celery_app.AsyncResult(task_id)
+    state = result.state
+
+    if state == "PENDING":
+        return SentimentTaskStatusResponse(task_id=task_id, status=state)
+
+    if state == "PROGRESS":
+        return SentimentTaskStatusResponse(
+            task_id=task_id,
+            status=state,
+            progress=result.info if isinstance(result.info, dict) else None,
+        )
+
+    if state == "SUCCESS":
+        return SentimentTaskStatusResponse(
+            task_id=task_id,
+            status=state,
+            result=result.result if isinstance(result.result, dict) else None,
+        )
+
+    if state == "FAILURE":
+        return SentimentTaskStatusResponse(
+            task_id=task_id,
+            status=state,
+            error=str(result.info),
+        )
+
+    return SentimentTaskStatusResponse(
+        task_id=task_id,
+        status=state,
+        progress=result.info if isinstance(result.info, dict) else None,
     )

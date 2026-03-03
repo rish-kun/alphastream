@@ -3,18 +3,54 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import verify_token
 from app.database import get_db
+from app.models.user import User
 from app.services.websocket_manager import manager
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["websocket"])
+
+
+async def _authenticate_websocket(websocket: WebSocket) -> User | None:
+    """Authenticate websocket using query token or Authorization header."""
+    token = websocket.query_params.get("token")
+    if not token:
+        auth_header = websocket.headers.get("authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.removeprefix("Bearer ")
+
+    if not token:
+        return None
+
+    try:
+        payload = verify_token(token)
+    except ValueError:
+        return None
+
+    if payload.get("type") != "access":
+        return None
+
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+
+    async for db in get_db():
+        result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+        user = result.scalar_one_or_none()
+        if user is None or not user.is_active:
+            return None
+        return user
+
+    return None
 
 
 async def send_ping(websocket: WebSocket) -> None:
@@ -43,6 +79,11 @@ async def ws_news_feed(websocket: WebSocket) -> None:
     - Sends last 10 news articles on connect
     - Supports client messages for filter preferences
     """
+    user = await _authenticate_websocket(websocket)
+    if user is None:
+        await websocket.close(code=1008, reason="Authentication required")
+        return
+
     channel = "feed"
     await manager.connect(websocket, channel)
     stop_event = asyncio.Event()
@@ -80,9 +121,11 @@ async def ws_news_feed(websocket: WebSocket) -> None:
             await websocket.send_json(initial_payload)
             break
 
-        redis_task = asyncio.create_task(manager.subscribe_redis(channel, websocket))
+        redis_task = asyncio.create_task(
+            manager.subscribe_redis(channel, websocket))
 
-        keepalive_task = asyncio.create_task(keepalive_loop(websocket, stop_event))
+        keepalive_task = asyncio.create_task(
+            keepalive_loop(websocket, stop_event))
 
         try:
             while True:
@@ -122,6 +165,11 @@ async def ws_stock_updates(websocket: WebSocket, ticker: str) -> None:
     - Sends latest stock data and recent sentiment on connect
     - Streams real-time updates for that ticker
     """
+    user = await _authenticate_websocket(websocket)
+    if user is None:
+        await websocket.close(code=1008, reason="Authentication required")
+        return
+
     channel = f"stock:{ticker.upper()}"
     await manager.connect(websocket, channel)
     stop_event = asyncio.Event()
@@ -187,9 +235,11 @@ async def ws_stock_updates(websocket: WebSocket, ticker: str) -> None:
             await websocket.send_json(initial_payload)
             break
 
-        redis_task = asyncio.create_task(manager.subscribe_redis(channel, websocket))
+        redis_task = asyncio.create_task(
+            manager.subscribe_redis(channel, websocket))
 
-        keepalive_task = asyncio.create_task(keepalive_loop(websocket, stop_event))
+        keepalive_task = asyncio.create_task(
+            keepalive_loop(websocket, stop_event))
 
         try:
             while True:
@@ -229,6 +279,11 @@ async def ws_portfolio_updates(websocket: WebSocket, portfolio_id: str) -> None:
     - Sends current portfolio state on connect
     - Streams updates when portfolio stocks get new sentiment/alpha data
     """
+    user = await _authenticate_websocket(websocket)
+    if user is None:
+        await websocket.close(code=1008, reason="Authentication required")
+        return
+
     channel = f"portfolio:{portfolio_id}"
     await manager.connect(websocket, channel)
     stop_event = asyncio.Event()
@@ -273,7 +328,8 @@ async def ws_portfolio_updates(websocket: WebSocket, portfolio_id: str) -> None:
                 position_value = current_price * h.quantity
                 position_cost = cost * h.quantity
                 pnl = position_value - position_cost
-                pnl_pct = (pnl / position_cost * 100) if position_cost > 0 else 0.0
+                pnl_pct = (pnl / position_cost *
+                           100) if position_cost > 0 else 0.0
 
                 total_value += position_value
                 total_cost += position_cost
@@ -298,7 +354,8 @@ async def ws_portfolio_updates(websocket: WebSocket, portfolio_id: str) -> None:
                 )
 
             total_pnl = total_value - total_cost
-            total_pnl_pct = (total_pnl / total_cost * 100) if total_cost > 0 else 0.0
+            total_pnl_pct = (total_pnl / total_cost *
+                             100) if total_cost > 0 else 0.0
 
             initial_payload = {
                 "type": "portfolio_data",
@@ -322,9 +379,11 @@ async def ws_portfolio_updates(websocket: WebSocket, portfolio_id: str) -> None:
             await websocket.send_json(initial_payload)
             break
 
-        redis_task = asyncio.create_task(manager.subscribe_redis(channel, websocket))
+        redis_task = asyncio.create_task(
+            manager.subscribe_redis(channel, websocket))
 
-        keepalive_task = asyncio.create_task(keepalive_loop(websocket, stop_event))
+        keepalive_task = asyncio.create_task(
+            keepalive_loop(websocket, stop_event))
 
         try:
             while True:
