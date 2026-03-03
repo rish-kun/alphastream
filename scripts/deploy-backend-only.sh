@@ -93,7 +93,7 @@ while [ $count -lt $max_wait ]; do
     fi
     
     sleep 2
-    ((count++))
+    count=$((count + 1))
     echo -n "."
 done
 echo ""
