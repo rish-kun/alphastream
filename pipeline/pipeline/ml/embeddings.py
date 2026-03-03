@@ -1,6 +1,7 @@
 """Sentence embeddings for text similarity and clustering."""
 
 import logging
+import os
 
 import numpy as np
 
@@ -25,11 +26,14 @@ class EmbeddingModel:
         self._model_name = model_name
         self._model = None
         self._available = False
+        self._pid: int | None = None
 
     def _load_model(self) -> None:
         """Lazily load the sentence embedding model."""
-        if self._model is not None:
+        current_pid = os.getpid()
+        if self._model is not None and self._pid == current_pid:
             return
+        self._pid = current_pid
         try:
             from sentence_transformers import SentenceTransformer
 

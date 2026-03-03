@@ -7,6 +7,7 @@ duplicating ORM models from the backend.
 """
 
 import logging
+import os
 from contextlib import contextmanager
 
 from sqlalchemy import create_engine, text
@@ -16,15 +17,33 @@ from pipeline.config import settings
 
 logger = logging.getLogger(__name__)
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_size=5,
-    max_overflow=10,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-)
+_engine = None
+_current_pid = None
 
-SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
+
+def get_engine():
+    """Return a SQLAlchemy engine, creating a new one if forked to a new process.
+
+    This ensures fork-safety for Celery workers on macOS by detecting
+    process ID changes and recreating the engine accordingly.
+    """
+    global _engine, _current_pid
+    pid = os.getpid()
+    if _engine is None or pid != _current_pid:
+        _current_pid = pid
+        _engine = create_engine(
+            settings.DATABASE_URL,
+            pool_size=5,
+            max_overflow=10,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+        )
+    return _engine
+
+
+def get_session_factory():
+    """Return a sessionmaker bound to the current process engine."""
+    return sessionmaker(bind=get_engine(), expire_on_commit=False)
 
 
 # Required tables created by Alembic migration 001
@@ -59,7 +78,7 @@ def check_schema_ready() -> bool:
         return True
 
     try:
-        with engine.connect() as conn:
+        with get_engine().connect() as conn:
             result = conn.execute(
                 text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
             )
@@ -92,6 +111,7 @@ def get_db():
         with get_db() as db:
             result = db.execute(text("SELECT ..."))
     """
+    SessionLocal = get_session_factory()
     db = SessionLocal()
     try:
         yield db

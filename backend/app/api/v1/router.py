@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import get_current_user
 from app.api.v1.auth import router as auth_router
+from app.api.v1.endpoints import google_news
 from app.api.v1.news import router as news_router
 from app.api.v1.portfolio import router as portfolio_router
 from app.api.v1.research import router as research_router
+from app.api.v1.research_debug import router as research_debug_router
 from app.api.v1.sentiment import router as sentiment_router
 from app.api.v1.stocks import router as stocks_router
 from app.api.v1.websocket import router as websocket_router
@@ -14,14 +16,11 @@ from app.api.v1.websocket import router as websocket_router
 api_router = APIRouter(prefix="/api/v1")
 
 api_router.include_router(auth_router)
-api_router.include_router(stocks_router, dependencies=[
-                          Depends(get_current_user)])
-api_router.include_router(news_router, dependencies=[
-                          Depends(get_current_user)])
-api_router.include_router(portfolio_router, dependencies=[
-                          Depends(get_current_user)])
-api_router.include_router(research_router, dependencies=[
-                          Depends(get_current_user)])
-api_router.include_router(sentiment_router, dependencies=[
-                          Depends(get_current_user)])
+api_router.include_router(google_news.router, dependencies=[Depends(get_current_user)])
+api_router.include_router(stocks_router, dependencies=[Depends(get_current_user)])
+api_router.include_router(news_router, dependencies=[Depends(get_current_user)])
+api_router.include_router(portfolio_router, dependencies=[Depends(get_current_user)])
+api_router.include_router(research_router, dependencies=[Depends(get_current_user)])
+api_router.include_router(research_debug_router)  # Debug endpoints don't require auth
+api_router.include_router(sentiment_router, dependencies=[Depends(get_current_user)])
 api_router.include_router(websocket_router)

@@ -1,6 +1,6 @@
-"""Extensive research tasks using Firecrawl, Thunderbit, and Browse.ai scrapers.
+"""Extensive research tasks using Firecrawl, Thunderbit, Browse.ai, and Google News scrapers.
 
-Orchestrates all three scraping services to perform deep research on a
+Orchestrates all four scraping services to perform deep research on a
 stock, topic, or entire portfolio.  Results are deduplicated by URL,
 stored in ``news_articles``, and downstream analysis tasks are dispatched
 automatically.
@@ -8,13 +8,14 @@ automatically.
 
 import logging
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 
 from celery import Task
 from sqlalchemy import text
 
 from pipeline.celery_app import app
 from pipeline.database import get_db
+from pipeline.scrapers.google_news import GoogleNewsClient
 from pipeline.utils.deduplication import compute_content_hash
 from pipeline.utils.publisher import publish_event
 
@@ -217,6 +218,31 @@ def _run_scrapers(query: str, limit: int = 10) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Helper: run Google News scraper for a single query
+# ---------------------------------------------------------------------------
+
+
+def _run_google_news(query: str, max_results: int = 15) -> list[dict]:
+    """Execute Google News search for a single query.
+
+    Args:
+        query: Search query string.
+        max_results: Maximum number of results to return.
+
+    Returns:
+        List of normalised article dicts from Google News.
+    """
+    try:
+        google_news_client = GoogleNewsClient()
+        articles = google_news_client.search(query, max_results=max_results)
+        logger.info("Google News returned %d results for: %s", len(articles), query)
+        return articles
+    except Exception:
+        logger.warning("Google News scraper failed for query: %s", query, exc_info=True)
+        return []
+
+
+# ---------------------------------------------------------------------------
 # Celery tasks
 # ---------------------------------------------------------------------------
 
@@ -337,6 +363,58 @@ def research_stock(self: Task, ticker: str, user_id: str) -> dict:
                 exc_info=True,
             )
 
+    # Google News scraping phase - search each query and collect articles
+    self.update_state(
+        state="PROGRESS",
+        meta={
+            "stage": "google_news_scraping",
+            "ticker": ticker,
+            "started_at": started_at,
+            "updated_at": _utcnow_iso(),
+            "total_queries": total_queries,
+            "completed_queries": total_queries,
+            "articles_found_so_far": total_found,
+            "articles_new_so_far": total_new,
+            "percent_complete": 80.0,
+        },
+    )
+
+    google_news_articles: list[dict] = []
+    for query in queries:
+        try:
+            gn_articles = _run_google_news(query, max_results=15)
+            google_news_articles.extend(gn_articles)
+        except Exception as e:
+            logger.error(f"Google News search failed for query '{query}': {e}")
+
+    # Sort by published_at (newest first) and take top 50
+    google_news_articles.sort(
+        key=lambda x: x.get("published_at") or datetime.min, reverse=True
+    )
+    top_google_news = google_news_articles[:50]
+
+    if top_google_news:
+        gn_new, gn_ids = _store_research_articles(
+            top_google_news, source_query="google_news"
+        )
+        total_new += gn_new
+        total_found += len(top_google_news)
+        inserted_article_ids.extend(gn_ids)
+        logger.info(f"Added {len(top_google_news)} Google News articles, {gn_new} new")
+
+    # Prioritize top 50 articles for sentiment analysis
+    if inserted_article_ids:
+        try:
+            from pipeline.tasks.prioritized_analysis import analyze_top_articles
+
+            analyze_top_articles.delay(
+                article_ids=[str(aid) for aid in inserted_article_ids],
+                top_n=50,
+                priority="recency",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to dispatch prioritized analysis: {e}")
+
     completed_at = _utcnow_iso()
     started_dt = datetime.fromisoformat(started_at)
     completed_dt = datetime.fromisoformat(completed_at)
@@ -350,16 +428,19 @@ def research_stock(self: Task, ticker: str, user_id: str) -> dict:
                 "ticker": ticker,
                 "user_id": user_id,
                 "articles_found": total_new,
+                "google_news_articles": len(top_google_news),
+                "top_50_analyzed": 50,
             },
         )
     except Exception:
         logger.warning("Failed to publish research completion event for %s", ticker)
 
     logger.info(
-        "Stock research complete: ticker=%s, new=%d, total_found=%d",
+        "Stock research complete: ticker=%s, new=%d, total_found=%d, google_news=%d",
         ticker,
         total_new,
         total_found,
+        len(top_google_news),
     )
 
     return {
@@ -370,6 +451,8 @@ def research_stock(self: Task, ticker: str, user_id: str) -> dict:
         "total_found": total_found,
         "article_ids": inserted_article_ids,
         "query_count": total_queries,
+        "google_news_articles": len(top_google_news),
+        "top_50_analyzed": 50,
         "started_at": started_at,
         "completed_at": completed_at,
         "duration_seconds": max(0.0, (completed_dt - started_dt).total_seconds()),
@@ -472,6 +555,58 @@ def research_topic(self: Task, topic: str, user_id: str) -> dict:
                 exc_info=True,
             )
 
+    # Google News scraping phase - search each query and collect articles
+    self.update_state(
+        state="PROGRESS",
+        meta={
+            "stage": "google_news_scraping",
+            "topic": topic,
+            "started_at": started_at,
+            "updated_at": _utcnow_iso(),
+            "total_queries": total_queries,
+            "completed_queries": total_queries,
+            "articles_found_so_far": total_found,
+            "articles_new_so_far": total_new,
+            "percent_complete": 80.0,
+        },
+    )
+
+    google_news_articles: list[dict] = []
+    for query in queries:
+        try:
+            gn_articles = _run_google_news(query, max_results=15)
+            google_news_articles.extend(gn_articles)
+        except Exception as e:
+            logger.error(f"Google News search failed for query '{query}': {e}")
+
+    # Sort by published_at (newest first) and take top 50
+    google_news_articles.sort(
+        key=lambda x: x.get("published_at") or datetime.min, reverse=True
+    )
+    top_google_news = google_news_articles[:50]
+
+    if top_google_news:
+        gn_new, gn_ids = _store_research_articles(
+            top_google_news, source_query="google_news"
+        )
+        total_new += gn_new
+        total_found += len(top_google_news)
+        inserted_article_ids.extend(gn_ids)
+        logger.info(f"Added {len(top_google_news)} Google News articles, {gn_new} new")
+
+    # Prioritize top 50 articles for sentiment analysis
+    if inserted_article_ids:
+        try:
+            from pipeline.tasks.prioritized_analysis import analyze_top_articles
+
+            analyze_top_articles.delay(
+                article_ids=[str(aid) for aid in inserted_article_ids],
+                top_n=50,
+                priority="recency",
+            )
+        except Exception as e:
+            logger.warning(f"Failed to dispatch prioritized analysis: {e}")
+
     completed_at = _utcnow_iso()
     started_dt = datetime.fromisoformat(started_at)
     completed_dt = datetime.fromisoformat(completed_at)
@@ -485,6 +620,8 @@ def research_topic(self: Task, topic: str, user_id: str) -> dict:
                 "topic": topic,
                 "user_id": user_id,
                 "articles_found": total_new,
+                "google_news_articles": len(top_google_news),
+                "top_50_analyzed": 50,
             },
         )
     except Exception:
@@ -493,10 +630,11 @@ def research_topic(self: Task, topic: str, user_id: str) -> dict:
         )
 
     logger.info(
-        "Topic research complete: topic='%s', new=%d, total_found=%d",
+        "Topic research complete: topic='%s', new=%d, total_found=%d, google_news=%d",
         topic,
         total_new,
         total_found,
+        len(top_google_news),
     )
 
     return {
@@ -507,6 +645,8 @@ def research_topic(self: Task, topic: str, user_id: str) -> dict:
         "total_found": total_found,
         "article_ids": inserted_article_ids,
         "query_count": total_queries,
+        "google_news_articles": len(top_google_news),
+        "top_50_analyzed": 50,
         "started_at": started_at,
         "completed_at": completed_at,
         "duration_seconds": max(0.0, (completed_dt - started_dt).total_seconds()),

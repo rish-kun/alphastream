@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.database import get_db
@@ -189,6 +190,7 @@ async def get_research_result(
         stmt = (
             select(NewsArticle)
             .where(NewsArticle.id.in_(parsed_ids))
+            .options(selectinload(NewsArticle.sentiment_analyses))
             .order_by(NewsArticle.published_at.desc())
         )
         rows = await db.execute(stmt)

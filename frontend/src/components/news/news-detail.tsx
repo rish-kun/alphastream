@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -14,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { SentimentBadge } from "@/components/news/sentiment-badge";
+import { ReanalyzingBadge } from "@/components/news/reanalyzing-badge";
 import {
   ArrowLeft,
   ExternalLink,
@@ -26,7 +28,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
-import { getNewsArticle, reanalyzeSentiment } from "@/lib/api";
+import { getNewsArticle, reanalyzeSentiment, getArticleReanalysisStatus } from "@/lib/api";
 import type { NewsArticleDetail, SentimentAnalysisEntry } from "@/types/news";
 import { toast } from "sonner";
 
@@ -61,6 +63,9 @@ interface NewsDetailProps {
 
 export function NewsDetail({ id }: NewsDetailProps) {
   const queryClient = useQueryClient();
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
+  const [previousStatus, setPreviousStatus] = useState<string | null>(null);
+
   const {
     data: article,
     isLoading,
@@ -70,13 +75,59 @@ export function NewsDetail({ id }: NewsDetailProps) {
     queryFn: () => getNewsArticle(id),
   });
 
+  // Poll for reanalysis status when reanalysis is active
+  const { data: reanalysisStatus } = useQuery({
+    queryKey: ["reanalysis-status", id],
+    queryFn: () => getArticleReanalysisStatus(id),
+    enabled: isReanalyzing,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data || data.status === "completed" || data.status === "failed") {
+        return false;
+      }
+      return 2000; // Poll every 2 seconds
+    },
+  });
+
+  // Handle reanalysis status changes
+  useEffect(() => {
+    if (!reanalysisStatus) return;
+
+    const status = reanalysisStatus.status;
+
+    // Track status changes
+    if (previousStatus !== status) {
+      setPreviousStatus(status);
+
+      if (status === "completed") {
+        setIsReanalyzing(false);
+        toast.success("Reanalysis complete!", {
+          description: "The article sentiment has been updated.",
+        });
+        // Refresh article data
+        void queryClient.invalidateQueries({ queryKey: ["article", id] });
+        void queryClient.invalidateQueries({ queryKey: ["news"] });
+        void queryClient.invalidateQueries({ queryKey: ["trending-news"] });
+      } else if (status === "failed") {
+        setIsReanalyzing(false);
+        toast.error("Reanalysis failed", {
+          description: reanalysisStatus.error || "An error occurred during analysis.",
+        });
+      }
+    }
+  }, [reanalysisStatus, previousStatus, id, queryClient]);
+
   const reanalyzeMutation = useMutation({
     mutationFn: async () => reanalyzeSentiment([id]),
-    onSuccess: () => {
-      toast.success("Sentiment re-analysis started");
-      void queryClient.invalidateQueries({ queryKey: ["article", id] });
-      void queryClient.invalidateQueries({ queryKey: ["news"] });
-      void queryClient.invalidateQueries({ queryKey: ["trending-news"] });
+    onSuccess: (data) => {
+      if (data.dispatched > 0) {
+        setIsReanalyzing(true);
+        toast.info("Sentiment re-analysis started", {
+          description: "Previous analysis will remain visible until complete.",
+        });
+      } else {
+        toast.warning("No articles were dispatched for reanalysis");
+      }
     },
     onError: (error) => {
       toast.error(
@@ -119,6 +170,10 @@ export function NewsDetail({ id }: NewsDetailProps) {
         ) / article.sentiment_analyses.length
       : null;
 
+  const showReanalyzingBadge = isReanalyzing || 
+    (reanalysisStatus?.status && 
+     ["pending", "started", "analyzing"].includes(reanalysisStatus.status));
+
   return (
     <div className="space-y-6">
       <BackButton />
@@ -153,14 +208,19 @@ export function NewsDetail({ id }: NewsDetailProps) {
             {avgSentiment !== null && (
               <SentimentBadge score={avgSentiment} size="lg" />
             )}
+            {showReanalyzingBadge && (
+              <ReanalyzingBadge 
+                status={reanalysisStatus?.status || "analyzing"} 
+              />
+            )}
             <Button
               variant="outline"
               size="sm"
               className="gap-1.5"
-              disabled={reanalyzeMutation.isPending}
+              disabled={reanalyzeMutation.isPending || isReanalyzing}
               onClick={() => reanalyzeMutation.mutate()}
             >
-              {reanalyzeMutation.isPending ? (
+              {reanalyzeMutation.isPending || isReanalyzing ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -197,7 +257,10 @@ export function NewsDetail({ id }: NewsDetailProps) {
           {/* Sentiment Analysis Section */}
           {article.sentiment_analyses?.length > 0 && (
             <>
-              <SentimentSection analyses={article.sentiment_analyses} />
+              <SentimentSection 
+                analyses={article.sentiment_analyses} 
+                isReanalyzing={isReanalyzing}
+              />
               <Separator />
             </>
           )}
@@ -261,18 +324,27 @@ export function NewsDetail({ id }: NewsDetailProps) {
 
 function SentimentSection({
   analyses,
+  isReanalyzing,
 }: {
   analyses: SentimentAnalysisEntry[];
+  isReanalyzing?: boolean;
 }) {
   const primary = analyses[0];
   const hasMultiple = analyses.length > 1;
 
   return (
-    <div>
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        <BarChart3 className="h-4 w-4" />
-        Sentiment Analysis
-      </h3>
+    <div className={isReanalyzing ? "opacity-70 transition-opacity" : ""}>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-sm font-semibold">
+          <BarChart3 className="h-4 w-4" />
+          Sentiment Analysis
+        </h3>
+        {isReanalyzing && (
+          <span className="text-xs text-muted-foreground italic">
+            Previous analysis
+          </span>
+        )}
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         {/* Score */}

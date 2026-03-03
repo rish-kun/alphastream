@@ -1,6 +1,7 @@
 """FinBERT sentiment analysis for financial text."""
 
 import logging
+import os
 import threading
 from collections.abc import Sequence
 
@@ -19,6 +20,7 @@ class FinBERTAnalyzer:
     _shared_pipeline = None
     _shared_available = False
     _shared_model_name: str | None = None
+    _shared_pid: int | None = None
     _load_lock = threading.Lock()
 
     def __init__(self) -> None:
@@ -31,9 +33,12 @@ class FinBERTAnalyzer:
     def _load_model(self) -> None:
         """Lazily load the FinBERT model and tokenizer."""
         configured_model = self._get_model_name()
+        current_pid = os.getpid()
+
         if (
             self.__class__._shared_pipeline is not None
             and self.__class__._shared_model_name == configured_model
+            and self.__class__._shared_pid == current_pid
         ):
             self._pipeline = self.__class__._shared_pipeline
             self._available = self.__class__._shared_available
@@ -46,6 +51,7 @@ class FinBERTAnalyzer:
             if (
                 self.__class__._shared_pipeline is not None
                 and self.__class__._shared_model_name == configured_model
+                and self.__class__._shared_pid == current_pid
             ):
                 self._pipeline = self.__class__._shared_pipeline
                 self._available = self.__class__._shared_available
@@ -72,6 +78,7 @@ class FinBERTAnalyzer:
                 self.__class__._shared_pipeline = self._pipeline
                 self.__class__._shared_available = True
                 self.__class__._shared_model_name = configured_model
+                self.__class__._shared_pid = current_pid
                 logger.info("FinBERT model loaded successfully")
             except ImportError:
                 logger.warning("transformers not installed, FinBERT unavailable")

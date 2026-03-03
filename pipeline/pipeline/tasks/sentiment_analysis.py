@@ -9,6 +9,15 @@ from celery import Task
 from sqlalchemy import text
 
 from pipeline.celery_app import app
+import asyncio
+
+# Import for reanalysis status tracking
+try:
+    import redis.asyncio as redis_lib
+    _REDIS_AVAILABLE = True
+except ImportError:
+    _REDIS_AVAILABLE = False
+
 from pipeline.config import settings
 from pipeline.database import check_schema_ready, get_db
 
@@ -16,6 +25,37 @@ logger = logging.getLogger(__name__)
 
 _FINBERT_ANALYZER = None
 
+
+
+
+async def _update_reanalysis_status(article_id: str, status: str, **kwargs) -> None:
+    """Update reanalysis status in Redis if available."""
+    if not _REDIS_AVAILABLE:
+        return
+    
+    try:
+        from app.config import settings
+        redis = redis_lib.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+        key = f"reanalysis:article:{article_id}"
+        
+        existing = await redis.get(key)
+        if existing:
+            import json
+            data = json.loads(existing)
+            data["status"] = status
+            data.update(kwargs)
+            if status == "completed":
+                data["completed_at"] = datetime.now(timezone.utc).isoformat()
+                await redis.setex(key, 60, json.dumps(data))
+            elif status == "failed":
+                data["failed_at"] = datetime.now(timezone.utc).isoformat()
+                await redis.setex(key, 60, json.dumps(data))
+            else:
+                data["updated_at"] = datetime.now(timezone.utc).isoformat()
+                await redis.setex(key, 300, json.dumps(data))
+        await redis.close()
+    except Exception:
+        pass  # Fail silently for status tracking
 
 def _get_finbert_analyzer():
     global _FINBERT_ANALYZER
@@ -408,6 +448,21 @@ def analyze_article(self: Task, article_id: str, force_reanalyze: bool = False) 
             logger.debug(
                 "Failed to publish sentiment update for %s", article_id)
 
+        # Update reanalysis status
+        try:
+            asyncio.run(_update_reanalysis_status(
+                article_id,
+                "completed",
+                result={
+                    "finbert_score": finbert_score,
+                    "llm_score": blended_llm_score,
+                    "ensemble_score": ensemble_score,
+                    "confidence": confidence,
+                }
+            ))
+        except Exception:
+            pass
+        
         return {
             "article_id": article_id,
             "status": "success",
@@ -420,6 +475,16 @@ def analyze_article(self: Task, article_id: str, force_reanalyze: bool = False) 
     except Exception as exc:
         logger.error(
             "Failed to save sentiment analysis for %s: %s", article_id, exc)
+        # Update reanalysis status
+        try:
+            import asyncio
+            asyncio.run(_update_reanalysis_status(
+                article_id,
+                "failed",
+                error=str(exc)
+            ))
+        except Exception:
+            pass
         raise self.retry(exc=exc)
 
 

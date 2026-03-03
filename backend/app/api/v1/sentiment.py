@@ -22,6 +22,8 @@ from app.schemas.sentiment import (
     SectorSentiment,
     SentimentOverview,
 )
+from app.services.reanalysis_status import reanalysis_status_service
+
 
 router = APIRouter(prefix="/sentiment", tags=["sentiment"])
 
@@ -62,6 +64,18 @@ class SentimentTaskStatusResponse(BaseModel):
     progress: dict | None = None
     result: dict | None = None
     error: str | None = None
+
+class ArticleReanalysisStatusResponse(BaseModel):
+    article_id: str
+    status: str
+    task_id: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    failed_at: str | None = None
+    progress: dict | None = None
+    result: dict | None = None
+    error: str | None = None
+
 
 
 @router.get("/overview", response_model=SentimentOverview)
@@ -280,6 +294,13 @@ async def reanalyze_articles_sentiment(
             kwargs={"force_reanalyze": body.force_reanalyze},
         )
         task_ids.append(task.id)
+        
+        # Track reanalysis status in Redis
+        await reanalysis_status_service.start_reanalysis(
+            article_id=article_id_str,
+            task_id=task.id,
+            user_id=str(current_user.id) if current_user else None,
+        )
 
     return SentimentReanalysisResponse(
         dispatched=len(task_ids),
@@ -352,4 +373,33 @@ async def get_reanalyze_all_status(
         task_id=task_id,
         status=state,
         progress=result.info if isinstance(result.info, dict) else None,
+    )
+
+@router.get(
+    "/reanalyze/article/{article_id}/status",
+    response_model=ArticleReanalysisStatusResponse,
+)
+async def get_article_reanalysis_status(
+    article_id: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> ArticleReanalysisStatusResponse:
+    """Get the reanalysis status for a specific article."""
+    status_data = await reanalysis_status_service.get_status(article_id)
+    
+    if not status_data:
+        return ArticleReanalysisStatusResponse(
+            article_id=article_id,
+            status="not_found",
+        )
+    
+    return ArticleReanalysisStatusResponse(
+        article_id=status_data.get("article_id", article_id),
+        status=status_data.get("status", "unknown"),
+        task_id=status_data.get("task_id"),
+        started_at=status_data.get("started_at"),
+        completed_at=status_data.get("completed_at"),
+        failed_at=status_data.get("failed_at"),
+        progress=status_data.get("progress"),
+        result=status_data.get("result"),
+        error=status_data.get("error"),
     )

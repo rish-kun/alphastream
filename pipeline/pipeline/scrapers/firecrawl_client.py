@@ -79,14 +79,40 @@ class FirecrawlClient:
 
             response = app.search(query, limit=limit)
 
-            # The SDK may return a list directly or a dict with a "data" key
-            # depending on the version. Handle both.
+            # Debug: Log all attributes of the response object
+            logger.debug("Firecrawl response type: %s", type(response))
+            logger.debug(
+                "Firecrawl response attributes: %s",
+                [attr for attr in dir(response) if not attr.startswith("_")],
+            )
+            if hasattr(response, "data"):
+                logger.debug("Firecrawl response.data type: %s", type(response.data))
+                logger.debug(
+                    "Firecrawl response.data value: %s", str(response.data)[:500]
+                )
+            if hasattr(response, "success"):
+                logger.debug("Firecrawl response.success: %s", response.success)
+
+            # The SDK may return a list directly, a dict with a "data" key,
+            # or a SearchData object depending on the version. Handle all.
             if isinstance(response, dict):
                 results = response.get("data", [])
             elif isinstance(response, list):
                 results = response
+            elif hasattr(response, "news"):
+                # Handle SearchData object from firecrawl v2 SDK
+                # The SearchData object has .news, .web, .images attributes
+                results = response.news or []
+                if not results and hasattr(response, "web"):
+                    results = response.web or []
             else:
                 results = []
+
+            # Debug logging
+            logger.debug("Firecrawl extracted %d results from response", len(results))
+            if results and len(results) > 0:
+                logger.debug("Firecrawl first result type: %s", type(results[0]))
+                logger.debug("Firecrawl first result: %s", str(results[0])[:300])
 
             articles: list[dict] = []
             for item in results:

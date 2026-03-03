@@ -17,7 +17,7 @@ router = APIRouter(prefix="/news", tags=["news"])
 @router.get("/", response_model=NewsListResponse)
 async def get_news_feed(
     page: Annotated[int, Query(ge=1)] = 1,
-    page_size: Annotated[int, Query(ge=1, le=50)] = 20,
+    page_size: Annotated[int, Query(ge=1, le=1000)] = 20,
     source: Annotated[str | None, Query()] = None,
     category: Annotated[str | None, Query()] = None,
     ticker: Annotated[str | None, Query()] = None,

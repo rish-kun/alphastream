@@ -32,7 +32,9 @@ import {
 } from "lucide-react";
 import { getNewsFeed, getTrendingNews, reanalyzeSentiment } from "@/lib/api";
 import { TopicResearchButton } from "@/components/research/topic-research-button";
-import type { NewsFeedParams } from "@/types/news";
+import { Pagination } from "@/components/ui/pagination";
+import { sortByAbsoluteSentimentDeviation } from "@/lib/sorting";
+import type { NewsFeedParams, NewsArticleListItem } from "@/types/news";
 import { toast } from "sonner";
 
 const NEWS_SOURCES = [
@@ -46,19 +48,21 @@ const NEWS_SOURCES = [
   { value: "Bloomberg", label: "Bloomberg" },
 ];
 
-const PAGE_SIZE = 20;
+const ITEMS_PER_PAGE = 20;
+const MAX_TOTAL_ITEMS = 600;
 
 export default function NewsPage() {
   const [source, setSource] = useState("all");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [sortBy, setSortBy] = useState<"recent" | "impact" | "neutral">("impact");
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedArticleIds, setSelectedArticleIds] = useState<string[]>([]);
   const [activeReanalysisIds, setActiveReanalysisIds] = useState<string[]>([]);
-  const observerRef = useRef<IntersectionObserver | null>(null);
   const queryClient = useQueryClient();
 
   const filters: NewsFeedParams = {
-    size: PAGE_SIZE,
+    size: MAX_TOTAL_ITEMS,
     ...(source !== "all" && { source }),
     ...(search && { search }),
   };
@@ -73,63 +77,45 @@ export default function NewsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Infinite scroll news feed
+  // News feed query - fetch a large batch for frontend sorting/pagination
   const {
     data,
     isLoading,
-    isFetchingNextPage,
-    fetchNextPage,
-    hasNextPage,
-  } = useInfiniteQuery({
+  } = useQuery({
     queryKey: ["news", filters],
-    queryFn: ({ pageParam = 1 }) =>
-      getNewsFeed({ page: pageParam, ...filters }),
-    getNextPageParam: (lastPage) =>
-      lastPage.page < Math.ceil(lastPage.total / lastPage.size)
-        ? lastPage.page + 1
-        : undefined,
-    initialPageParam: 1,
+    queryFn: () => getNewsFeed({ page: 1, ...filters }),
+    staleTime: 2 * 60 * 1000,
   });
 
-  // Intersection observer for infinite scroll
-  const lastItemRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (isFetchingNextPage) return;
-      if (observerRef.current) observerRef.current.disconnect();
+  const allArticles = data?.items ?? [];
+  const totalArticles = data?.total ?? 0;
 
-      observerRef.current = new IntersectionObserver(
-        (entries) => {
-          if (entries[0]?.isIntersecting && hasNextPage) {
-            fetchNextPage();
-          }
-        },
-        { threshold: 0.1 }
-      );
+  const sortedArticles = useMemo(() => {
+    if (sortBy === "impact") {
+      return sortByAbsoluteSentimentDeviation(allArticles, "desc");
+    }
+    if (sortBy === "neutral") {
+      return sortByAbsoluteSentimentDeviation(allArticles, "asc");
+    }
+    // Default: already sorted by published_at desc from backend
+    return allArticles;
+  }, [allArticles, sortBy]);
 
-      if (node) observerRef.current.observe(node);
-    },
-    [isFetchingNextPage, hasNextPage, fetchNextPage]
-  );
+  const paginatedArticles = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return sortedArticles.slice(start, start + ITEMS_PER_PAGE);
+  }, [sortedArticles, currentPage]);
 
-  // Cleanup observer on unmount
-  useEffect(() => {
-    return () => {
-      if (observerRef.current) observerRef.current.disconnect();
-    };
-  }, []);
+  const totalPages = Math.ceil(sortedArticles.length / ITEMS_PER_PAGE);
 
-  const allArticles =
-    data?.pages
-      .flatMap((page) => page.items ?? [])
-      .filter(
-        (article): article is NonNullable<typeof article> =>
-          Boolean(article?.id)
-      ) ?? [];
-  const totalArticles = data?.pages[0]?.total ?? 0;
   const loadedArticleIds = useMemo(
     () => allArticles.map((article) => article.id),
     [allArticles]
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [source, search, sortBy]);
 
   useEffect(() => {
     setSelectedArticleIds((prev) => {
@@ -256,7 +242,7 @@ export default function NewsPage() {
 
             {/* Source Filter */}
             <Select value={source} onValueChange={setSource}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Source" />
               </SelectTrigger>
               <SelectContent>
@@ -265,6 +251,21 @@ export default function NewsPage() {
                     {s.label}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+
+            {/* Sort Order */}
+            <Select
+              value={sortBy}
+              onValueChange={(v) => setSortBy(v as "recent" | "impact" | "neutral")}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="impact">High Impact</SelectItem>
+                <SelectItem value="neutral">Most Neutral</SelectItem>
+                <SelectItem value="recent">Most Recent</SelectItem>
               </SelectContent>
             </Select>
 
@@ -387,12 +388,12 @@ export default function NewsPage() {
       )}
 
       {/* News Feed */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         {isLoading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <NewsCardSkeleton key={i} />
           ))
-        ) : allArticles.length === 0 ? (
+        ) : sortedArticles.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Newspaper className="h-12 w-12 text-muted-foreground" />
@@ -416,60 +417,39 @@ export default function NewsPage() {
           </Card>
         ) : (
           <>
-            {allArticles.map((article, index) => {
-              const isLast = index === allArticles.length - 1;
-              const isSelected = selectedArticleIds.includes(article.id);
-              return (
-                <div
-                  key={article.id}
-                  ref={isLast ? lastItemRef : undefined}
-                  className="flex items-start gap-3"
-                >
-                  <input
-                    type="checkbox"
-                    className="mt-5 h-4 w-4 rounded border-border"
-                    checked={isSelected}
-                    onChange={(event) =>
-                      toggleArticleSelection(article.id, event.target.checked)
-                    }
-                    disabled={reanalyzeMutation.isPending}
-                    aria-label={`Select article ${article.title}`}
-                  />
-                  <div className="flex-1">
-                    <NewsCard article={article} />
+            <div className="space-y-3">
+              {paginatedArticles.map((article) => {
+                const isSelected = selectedArticleIds.includes(article.id);
+                return (
+                  <div
+                    key={article.id}
+                    className="flex items-start gap-3"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-5 h-4 w-4 rounded border-border"
+                      checked={isSelected}
+                      onChange={(event) =>
+                        toggleArticleSelection(article.id, event.target.checked)
+                      }
+                      disabled={reanalyzeMutation.isPending}
+                      aria-label={`Select article ${article.title}`}
+                    />
+                    <div className="flex-1">
+                      <NewsCard article={article} />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
 
-            {/* Loading more indicator */}
-            {isFetchingNextPage && (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-sm text-muted-foreground">
-                  Loading more articles...
-                </span>
-              </div>
-            )}
-
-            {/* Manual load more button as fallback */}
-            {hasNextPage && !isFetchingNextPage && (
-              <div className="flex justify-center pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => fetchNextPage()}
-                >
-                  Load More
-                </Button>
-              </div>
-            )}
-
-            {/* End of feed */}
-            {!hasNextPage && allArticles.length > 0 && (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                You&apos;ve reached the end of the news feed
-              </p>
-            )}
+            <div className="mt-8 flex justify-center pb-8">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            </div>
           </>
         )}
       </div>

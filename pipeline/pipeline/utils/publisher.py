@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 
 import redis
 
@@ -10,12 +11,15 @@ from pipeline.config import settings
 logger = logging.getLogger(__name__)
 
 _redis_client: redis.Redis | None = None
+_redis_pid: int | None = None
 
 
 def _get_redis() -> redis.Redis:
     """Get or create Redis client."""
-    global _redis_client
-    if _redis_client is None:
+    global _redis_client, _redis_pid
+    current_pid = os.getpid()
+    if _redis_client is None or _redis_pid != current_pid:
+        _redis_pid = current_pid
         _redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
     return _redis_client
 
