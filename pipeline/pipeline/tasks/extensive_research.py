@@ -36,7 +36,13 @@ def _build_research_summary(content: str, source_query: str) -> str | None:
     return f"{summary_prefix}{snippet}"
 
 
-def _store_research_articles(articles: list[dict], source_query: str) -> int:
+def _utcnow_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _store_research_articles(
+    articles: list[dict], source_query: str
+) -> tuple[int, list[str]]:
     """Persist scraped articles into ``news_articles`` after URL deduplication.
 
     Args:
@@ -45,12 +51,15 @@ def _store_research_articles(articles: list[dict], source_query: str) -> int:
         source_query: The search query that produced these results.
 
     Returns:
-        Number of newly inserted articles.
+        Tuple of:
+            - Number of newly inserted articles.
+            - Inserted article IDs.
     """
     if not articles:
-        return 0
+        return 0, []
 
     new_count = 0
+    inserted_article_ids: list[str] = []
 
     try:
         with get_db() as db:
@@ -114,6 +123,7 @@ def _store_research_articles(articles: list[dict], source_query: str) -> int:
                     },
                 )
                 new_count += 1
+                inserted_article_ids.append(article_id)
 
                 # Dispatch downstream analysis tasks for every new article
                 try:
@@ -147,7 +157,7 @@ def _store_research_articles(articles: list[dict], source_query: str) -> int:
         len(articles),
         source_query,
     )
-    return new_count
+    return new_count, inserted_article_ids
 
 
 # ---------------------------------------------------------------------------
@@ -235,9 +245,19 @@ def research_stock(self: Task, ticker: str, user_id: str) -> dict:
         "Starting extensive stock research: ticker=%s, user=%s", ticker, user_id
     )
 
+    started_at = _utcnow_iso()
     self.update_state(
         state="PROGRESS",
-        meta={"stage": "building_queries", "ticker": ticker},
+        meta={
+            "stage": "building_queries",
+            "ticker": ticker,
+            "started_at": started_at,
+            "updated_at": _utcnow_iso(),
+            "completed_queries": 0,
+            "articles_found_so_far": 0,
+            "articles_new_so_far": 0,
+            "percent_complete": 0.0,
+        },
     )
 
     # Build a set of search queries to maximise coverage
@@ -267,6 +287,8 @@ def research_stock(self: Task, ticker: str, user_id: str) -> dict:
 
     total_found = 0
     total_new = 0
+    inserted_article_ids: list[str] = []
+    total_queries = len(queries)
 
     for idx, query in enumerate(queries, start=1):
         self.update_state(
@@ -276,21 +298,48 @@ def research_stock(self: Task, ticker: str, user_id: str) -> dict:
                 "ticker": ticker,
                 "query": query,
                 "query_index": idx,
-                "total_queries": len(queries),
+                "started_at": started_at,
+                "updated_at": _utcnow_iso(),
+                "total_queries": total_queries,
+                "completed_queries": idx - 1,
+                "articles_found_so_far": total_found,
+                "articles_new_so_far": total_new,
+                "percent_complete": round(((idx - 1) / total_queries) * 100, 2),
             },
         )
 
         try:
             articles = _run_scrapers(query, limit=10)
             total_found += len(articles)
-            new = _store_research_articles(articles, source_query=query)
+            new, new_ids = _store_research_articles(articles, source_query=query)
             total_new += new
+            inserted_article_ids.extend(new_ids)
+            self.update_state(
+                state="PROGRESS",
+                meta={
+                    "stage": "scraping",
+                    "ticker": ticker,
+                    "query": query,
+                    "query_index": idx,
+                    "started_at": started_at,
+                    "updated_at": _utcnow_iso(),
+                    "total_queries": total_queries,
+                    "completed_queries": idx,
+                    "articles_found_so_far": total_found,
+                    "articles_new_so_far": total_new,
+                    "percent_complete": round((idx / total_queries) * 100, 2),
+                },
+            )
         except Exception:
             logger.error(
                 "Error during research_stock scraping (query=%s)",
                 query,
                 exc_info=True,
             )
+
+    completed_at = _utcnow_iso()
+    started_dt = datetime.fromisoformat(started_at)
+    completed_dt = datetime.fromisoformat(completed_at)
 
     # Publish completion event
     try:
@@ -315,9 +364,15 @@ def research_stock(self: Task, ticker: str, user_id: str) -> dict:
 
     return {
         "status": "completed",
+        "user_id": user_id,
         "ticker": ticker,
         "new_articles": total_new,
         "total_found": total_found,
+        "article_ids": inserted_article_ids,
+        "query_count": total_queries,
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "duration_seconds": max(0.0, (completed_dt - started_dt).total_seconds()),
     }
 
 
@@ -344,9 +399,19 @@ def research_topic(self: Task, topic: str, user_id: str) -> dict:
         "Starting extensive topic research: topic='%s', user=%s", topic, user_id
     )
 
+    started_at = _utcnow_iso()
     self.update_state(
         state="PROGRESS",
-        meta={"stage": "building_queries", "topic": topic},
+        meta={
+            "stage": "building_queries",
+            "topic": topic,
+            "started_at": started_at,
+            "updated_at": _utcnow_iso(),
+            "completed_queries": 0,
+            "articles_found_so_far": 0,
+            "articles_new_so_far": 0,
+            "percent_complete": 0.0,
+        },
     )
 
     queries = [
@@ -357,6 +422,8 @@ def research_topic(self: Task, topic: str, user_id: str) -> dict:
 
     total_found = 0
     total_new = 0
+    inserted_article_ids: list[str] = []
+    total_queries = len(queries)
 
     for idx, query in enumerate(queries, start=1):
         self.update_state(
@@ -366,21 +433,48 @@ def research_topic(self: Task, topic: str, user_id: str) -> dict:
                 "topic": topic,
                 "query": query,
                 "query_index": idx,
-                "total_queries": len(queries),
+                "started_at": started_at,
+                "updated_at": _utcnow_iso(),
+                "total_queries": total_queries,
+                "completed_queries": idx - 1,
+                "articles_found_so_far": total_found,
+                "articles_new_so_far": total_new,
+                "percent_complete": round(((idx - 1) / total_queries) * 100, 2),
             },
         )
 
         try:
             articles = _run_scrapers(query, limit=10)
             total_found += len(articles)
-            new = _store_research_articles(articles, source_query=query)
+            new, new_ids = _store_research_articles(articles, source_query=query)
             total_new += new
+            inserted_article_ids.extend(new_ids)
+            self.update_state(
+                state="PROGRESS",
+                meta={
+                    "stage": "scraping",
+                    "topic": topic,
+                    "query": query,
+                    "query_index": idx,
+                    "started_at": started_at,
+                    "updated_at": _utcnow_iso(),
+                    "total_queries": total_queries,
+                    "completed_queries": idx,
+                    "articles_found_so_far": total_found,
+                    "articles_new_so_far": total_new,
+                    "percent_complete": round((idx / total_queries) * 100, 2),
+                },
+            )
         except Exception:
             logger.error(
                 "Error during research_topic scraping (query=%s)",
                 query,
                 exc_info=True,
             )
+
+    completed_at = _utcnow_iso()
+    started_dt = datetime.fromisoformat(started_at)
+    completed_dt = datetime.fromisoformat(completed_at)
 
     # Publish completion event
     try:
@@ -407,9 +501,15 @@ def research_topic(self: Task, topic: str, user_id: str) -> dict:
 
     return {
         "status": "completed",
+        "user_id": user_id,
         "topic": topic,
         "new_articles": total_new,
         "total_found": total_found,
+        "article_ids": inserted_article_ids,
+        "query_count": total_queries,
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "duration_seconds": max(0.0, (completed_dt - started_dt).total_seconds()),
     }
 
 

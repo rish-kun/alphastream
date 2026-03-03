@@ -267,6 +267,9 @@ class TestSentimentAnalysis:
 
         mock_settings.GEMINI_API_KEYS = []
         mock_settings.OPENROUTER_API_KEYS = []
+        mock_settings.SENTIMENT_LOCAL_WEIGHT = 1.0
+        mock_settings.SENTIMENT_GEMINI_WEIGHT = 0.0
+        mock_settings.SENTIMENT_OPENROUTER_WEIGHT = 0.0
 
         # First call: SELECT article; second call: INSERT sentiment
         mock_db = MagicMock()
@@ -324,7 +327,9 @@ class TestExtensiveResearch:
         """_store_research_articles returns 0 for empty list."""
         from pipeline.tasks.extensive_research import _store_research_articles
 
-        assert _store_research_articles([], "test query") == 0
+        count, inserted_ids = _store_research_articles([], "test query")
+        assert count == 0
+        assert inserted_ids == []
 
     @patch("pipeline.tasks.extensive_research.get_db")
     def test_store_research_articles_inserts_new(self, mock_get_db):
@@ -353,9 +358,10 @@ class TestExtensiveResearch:
             mock_sa.delay = MagicMock()
             mock_ti.delay = MagicMock()
 
-            count = _store_research_articles(articles, "test query")
+            count, inserted_ids = _store_research_articles(articles, "test query")
 
         assert count == 1
+        assert len(inserted_ids) == 1
 
     @patch("pipeline.tasks.extensive_research.get_db")
     def test_store_research_articles_skips_empty_url(self, mock_get_db):
@@ -367,10 +373,14 @@ class TestExtensiveResearch:
 
         articles = [{"title": "No URL", "url": "", "content": "c", "source_name": "s"}]
 
-        count = _store_research_articles(articles, "q")
+        count, inserted_ids = _store_research_articles(articles, "q")
         assert count == 0
+        assert inserted_ids == []
 
-    @patch("pipeline.tasks.extensive_research._store_research_articles", return_value=3)
+    @patch(
+        "pipeline.tasks.extensive_research._store_research_articles",
+        return_value=(3, ["article-1"]),
+    )
     @patch("pipeline.tasks.extensive_research._run_scrapers")
     @patch("pipeline.tasks.extensive_research.publish_event")
     @patch("pipeline.tasks.extensive_research.get_db")
@@ -393,6 +403,7 @@ class TestExtensiveResearch:
 
         assert result["status"] == "completed"
         assert result["ticker"] == "RELIANCE"
+        assert "article_ids" in result
         assert mock_run.call_count >= 4  # at least 4 queries
 
     @patch("pipeline.tasks.extensive_research.research_stock")

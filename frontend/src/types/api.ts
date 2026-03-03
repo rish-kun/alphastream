@@ -111,7 +111,26 @@ export interface TopicResearchRequest {
 export interface TaskStatusResponse {
   task_id: string;
   status: string;
-  progress: Record<string, unknown> | null;
+  progress: ResearchStatusProgress | null;
   result: Record<string, unknown> | null;
   error: string | null;
+}
+
+export interface ResearchStatusProgress {
+  stage?: string;
+  topic?: string;
+  ticker?: string;
+  query?: string;
+  query_index?: number;
+  total_queries?: number;
+  completed_queries?: number;
+  percent_complete?: number;
+  articles_found_so_far?: number;
+  articles_new_so_far?: number;
+  expected_new_articles_low?: number | null;
+  expected_new_articles_high?: number | null;
+  elapsed_seconds?: number;
+  eta_seconds?: number | null;
+  started_at?: string;
+  updated_at?: string;
 }

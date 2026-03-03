@@ -40,11 +40,11 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
           <TrendingUp className="h-6 w-6 text-primary" />
-          <span className="text-lg font-bold">AlphaStream</span>
+          <span className="text-lg font-bold group-data-[collapsible=icon]:hidden">AlphaStream</span>
         </Link>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
           Indian Market Intelligence
         </p>
       </SidebarHeader>

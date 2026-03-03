@@ -31,7 +31,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { getNewsFeed, getTrendingNews, reanalyzeSentiment } from "@/lib/api";
-import { ResearchToggle } from "@/components/research/research-toggle";
+import { TopicResearchButton } from "@/components/research/topic-research-button";
 import type { NewsFeedParams } from "@/types/news";
 import { toast } from "sonner";
 
@@ -147,8 +147,7 @@ export default function NewsPage() {
     },
     onSuccess: (result, articleIds) => {
       toast.success(
-        `Re-analysis started for ${result.dispatched} article${
-          result.dispatched === 1 ? "" : "s"
+        `Re-analysis started for ${result.dispatched} article${result.dispatched === 1 ? "" : "s"
         }`
       );
       setSelectedArticleIds((prev) =>
@@ -228,18 +227,18 @@ export default function NewsPage() {
             <div className="flex gap-3 pb-3">
               {trendingLoading
                 ? Array.from({ length: 4 }).map((_, i) => (
-                    <TrendingCardSkeleton key={i} />
-                  ))
+                  <TrendingCardSkeleton key={i} />
+                ))
                 : trendingData?.articles
-                    ?.filter(
-                      (article): article is NonNullable<typeof article> =>
-                        Boolean(article?.id)
-                    )
-                    .map((article) => (
-                      <div key={article.id} className="w-[280px] shrink-0">
-                        <NewsCard article={article} variant="trending" />
-                      </div>
-                    ))}
+                  ?.filter(
+                    (article): article is NonNullable<typeof article> =>
+                      Boolean(article?.id)
+                  )
+                  .map((article) => (
+                    <div key={article.id} className="w-[280px] shrink-0">
+                      <NewsCard article={article} variant="trending" />
+                    </div>
+                  ))}
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -338,7 +337,7 @@ export default function NewsPage() {
 
       {/* Extensive Research for filtered topic */}
       {search && (
-        <ResearchToggle type="topic" topic={search} compact />
+        <TopicResearchButton topic={search} />
       )}
 
       {allArticles.length > 0 && (
@@ -365,7 +364,7 @@ export default function NewsPage() {
                 onClick={() => triggerReanalysis(selectedArticleIds)}
               >
                 {reanalyzeMutation.isPending &&
-                activeReanalysisIds.length > 1 ? (
+                  activeReanalysisIds.length > 1 ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <RefreshCw className="h-3.5 w-3.5" />
@@ -420,7 +419,6 @@ export default function NewsPage() {
             {allArticles.map((article, index) => {
               const isLast = index === allArticles.length - 1;
               const isSelected = selectedArticleIds.includes(article.id);
-              const isArticleReanalyzing = activeReanalysisIds.includes(article.id);
               return (
                 <div
                   key={article.id}
@@ -440,20 +438,6 @@ export default function NewsPage() {
                   <div className="flex-1">
                     <NewsCard article={article} />
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3 gap-1.5"
-                    disabled={reanalyzeMutation.isPending}
-                    onClick={() => triggerReanalysis([article.id])}
-                  >
-                    {reanalyzeMutation.isPending && isArticleReanalyzing ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    )}
-                    Re-analyze
-                  </Button>
                 </div>
               );
             })}
