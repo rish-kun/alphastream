@@ -227,7 +227,7 @@ log_success "✓ Frontend built"
 # Start backend
 log_info "Starting backend..."
 cd "$PROJECT_DIR/backend"
-nohup uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2 > /var/log/alphastream-backend.log 2>&1 &
+nohup uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --workers 2 > /var/log/alphastream-backend.log 2>&1 &
 BACKEND_PID=$!
 echo $BACKEND_PID > "$PROJECT_DIR/.pids"
 log_success "✓ Backend started (PID: $BACKEND_PID)"
@@ -274,7 +274,7 @@ log_info "=== Step 9: Health Verification ==="
 sleep 5
 
 # Check backend
-if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null; then
+if curl -sf http://127.0.0.1:8001/api/v1/health > /dev/null; then
     log_success "✓ Backend is responding"
 else
     log_warn "⚠ Backend health check failed"
