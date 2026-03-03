@@ -83,14 +83,7 @@ function formatScore(score: number | undefined | null): string {
 
 // ─── Summary Cards ───────────────────────────────────────────────────────────
 
-const fallbackOverview: SentimentOverview = {
-  overall_score: 0.32,
-  bullish_count: 42,
-  bearish_count: 18,
-  neutral_count: 26,
-  total_articles: 86,
-  updated_at: new Date().toISOString(),
-};
+
 
 function SummaryCards({ overview }: { overview: SentimentOverview }) {
   const metrics = [
@@ -196,13 +189,12 @@ function AlphaSignalsTable({ signals }: { signals: TopAlphaSignal[] }) {
               </TableCell>
               <TableCell className="text-right">
                 <span
-                  className={`font-mono font-semibold ${
-                    metric.composite_score > 0
+                  className={`font-mono font-semibold ${metric.composite_score > 0
                       ? "text-green-600 dark:text-green-400"
                       : metric.composite_score < 0
                         ? "text-red-600 dark:text-red-400"
                         : "text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   {formatScore(metric.composite_score)}
                 </span>
@@ -235,26 +227,14 @@ export function AlphaMetrics() {
     refetchInterval: 120000,
   });
 
-  const sentimentData = overview ?? fallbackOverview;
-
-  if (overviewLoading) {
-    return (
-      <>
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-4 rounded" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="mb-1 h-7 w-16" />
-              <Skeleton className="h-3 w-32" />
-            </CardContent>
-          </Card>
-        ))}
-      </>
-    );
-  }
+  const sentimentData: SentimentOverview = overview ?? {
+    overall_score: 0,
+    bullish_count: 0,
+    bearish_count: 0,
+    neutral_count: 0,
+    total_articles: 0,
+    updated_at: new Date().toISOString(),
+  };
 
   return (
     <>

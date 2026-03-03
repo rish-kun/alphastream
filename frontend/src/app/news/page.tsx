@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { NewsCard } from "@/components/news/news-card";
-import { SentimentBadge } from "@/components/news/sentiment-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,10 +28,12 @@ import {
   Loader2,
   Filter,
   X,
+  RefreshCw,
 } from "lucide-react";
-import { getNewsFeed, getTrendingNews } from "@/lib/api";
+import { getNewsFeed, getTrendingNews, reanalyzeSentiment } from "@/lib/api";
 import { ResearchToggle } from "@/components/research/research-toggle";
 import type { NewsFeedParams } from "@/types/news";
+import { toast } from "sonner";
 
 const NEWS_SOURCES = [
   { value: "all", label: "All Sources" },
@@ -44,14 +50,17 @@ const PAGE_SIZE = 20;
 
 export default function NewsPage() {
   const [source, setSource] = useState("all");
-  const [ticker, setTicker] = useState("");
-  const [tickerInput, setTickerInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [selectedArticleIds, setSelectedArticleIds] = useState<string[]>([]);
+  const [activeReanalysisIds, setActiveReanalysisIds] = useState<string[]>([]);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const queryClient = useQueryClient();
 
   const filters: NewsFeedParams = {
     size: PAGE_SIZE,
     ...(source !== "all" && { source }),
-    ...(ticker && { ticker }),
+    ...(search && { search }),
   };
 
   // Trending news query
@@ -60,7 +69,7 @@ export default function NewsPage() {
     isLoading: trendingLoading,
   } = useQuery({
     queryKey: ["trending-news"],
-    queryFn: getTrendingNews,
+    queryFn: () => getTrendingNews(),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -117,18 +126,86 @@ export default function NewsPage() {
           Boolean(article?.id)
       ) ?? [];
   const totalArticles = data?.pages[0]?.total ?? 0;
+  const loadedArticleIds = useMemo(
+    () => allArticles.map((article) => article.id),
+    [allArticles]
+  );
 
-  const handleTickerSearch = () => {
-    setTicker(tickerInput.trim().toUpperCase());
+  useEffect(() => {
+    setSelectedArticleIds((prev) => {
+      const filtered = prev.filter((articleId) =>
+        loadedArticleIds.includes(articleId)
+      );
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [loadedArticleIds]);
+
+  const reanalyzeMutation = useMutation({
+    mutationFn: async (articleIds: string[]) => {
+      setActiveReanalysisIds(articleIds);
+      return reanalyzeSentiment(articleIds);
+    },
+    onSuccess: (result, articleIds) => {
+      toast.success(
+        `Re-analysis started for ${result.dispatched} article${
+          result.dispatched === 1 ? "" : "s"
+        }`
+      );
+      setSelectedArticleIds((prev) =>
+        prev.filter((articleId) => !articleIds.includes(articleId))
+      );
+      void queryClient.invalidateQueries({ queryKey: ["news"] });
+      void queryClient.invalidateQueries({ queryKey: ["trending-news"] });
+      void queryClient.invalidateQueries({ queryKey: ["article"] });
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to trigger re-analysis"
+      );
+    },
+    onSettled: () => {
+      setActiveReanalysisIds([]);
+    },
+  });
+
+  const handleKeywordSearch = () => {
+    setSearch(searchInput.trim());
   };
 
   const clearFilters = () => {
     setSource("all");
-    setTicker("");
-    setTickerInput("");
+    setSearch("");
+    setSearchInput("");
+    setSelectedArticleIds([]);
   };
 
-  const hasActiveFilters = source !== "all" || ticker !== "";
+  const triggerReanalysis = (articleIds: string[]) => {
+    if (articleIds.length === 0 || reanalyzeMutation.isPending) return;
+    reanalyzeMutation.mutate(articleIds);
+  };
+
+  const toggleArticleSelection = (articleId: string, checked: boolean) => {
+    setSelectedArticleIds((prev) => {
+      if (checked) return Array.from(new Set([...prev, articleId]));
+      return prev.filter((id) => id !== articleId);
+    });
+  };
+
+  const areAllLoadedSelected =
+    loadedArticleIds.length > 0 &&
+    loadedArticleIds.every((articleId) => selectedArticleIds.includes(articleId));
+
+  const selectAllLoaded = () => {
+    setSelectedArticleIds((prev) =>
+      Array.from(new Set([...prev, ...loadedArticleIds]))
+    );
+  };
+
+  const clearSelection = () => {
+    setSelectedArticleIds([]);
+  };
+
+  const hasActiveFilters = source !== "all" || search !== "";
 
   return (
     <div className="space-y-6">
@@ -192,19 +269,19 @@ export default function NewsPage() {
               </SelectContent>
             </Select>
 
-            {/* Ticker Search */}
+            {/* Keyword / Ticker Search */}
             <div className="flex items-center gap-1">
               <Input
-                placeholder="Ticker (e.g. RELIANCE)"
-                value={tickerInput}
-                onChange={(e) => setTickerInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleTickerSearch()}
-                className="w-[200px]"
+                placeholder="Keyword or ticker (e.g. steel, gold, RELIANCE)"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleKeywordSearch()}
+                className="w-[280px]"
               />
               <Button
                 size="icon"
                 variant="ghost"
-                onClick={handleTickerSearch}
+                onClick={handleKeywordSearch}
               >
                 <Search className="h-4 w-4" />
               </Button>
@@ -224,16 +301,16 @@ export default function NewsPage() {
                       <X className="h-3 w-3" />
                     </Badge>
                   )}
-                  {ticker && (
+                  {search && (
                     <Badge
                       variant="secondary"
-                      className="gap-1 cursor-pointer font-mono"
+                      className="gap-1 cursor-pointer"
                       onClick={() => {
-                        setTicker("");
-                        setTickerInput("");
+                        setSearch("");
+                        setSearchInput("");
                       }}
                     >
-                      {ticker}
+                      {search}
                       <X className="h-3 w-3" />
                     </Badge>
                   )}
@@ -260,8 +337,54 @@ export default function NewsPage() {
       </Card>
 
       {/* Extensive Research for filtered topic */}
-      {ticker && (
-        <ResearchToggle type="stock" ticker={ticker} compact />
+      {search && (
+        <ResearchToggle type="topic" topic={search} compact />
+      )}
+
+      {allArticles.length > 0 && (
+        <Card>
+          <CardContent className="py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={areAllLoadedSelected ? clearSelection : selectAllLoaded}
+                disabled={reanalyzeMutation.isPending}
+              >
+                {areAllLoadedSelected ? "Clear selection" : "Select loaded"}
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {selectedArticleIds.length} selected
+              </span>
+              <Button
+                size="sm"
+                className="gap-1.5"
+                disabled={
+                  selectedArticleIds.length === 0 || reanalyzeMutation.isPending
+                }
+                onClick={() => triggerReanalysis(selectedArticleIds)}
+              >
+                {reanalyzeMutation.isPending &&
+                activeReanalysisIds.length > 1 ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                Re-analyze selected
+              </Button>
+              {selectedArticleIds.length > 0 && !areAllLoadedSelected && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSelection}
+                  disabled={reanalyzeMutation.isPending}
+                >
+                  Deselect all
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* News Feed */}
@@ -296,9 +419,41 @@ export default function NewsPage() {
           <>
             {allArticles.map((article, index) => {
               const isLast = index === allArticles.length - 1;
+              const isSelected = selectedArticleIds.includes(article.id);
+              const isArticleReanalyzing = activeReanalysisIds.includes(article.id);
               return (
-                <div key={article.id} ref={isLast ? lastItemRef : undefined}>
-                  <NewsCard article={article} />
+                <div
+                  key={article.id}
+                  ref={isLast ? lastItemRef : undefined}
+                  className="flex items-start gap-3"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-5 h-4 w-4 rounded border-border"
+                    checked={isSelected}
+                    onChange={(event) =>
+                      toggleArticleSelection(article.id, event.target.checked)
+                    }
+                    disabled={reanalyzeMutation.isPending}
+                    aria-label={`Select article ${article.title}`}
+                  />
+                  <div className="flex-1">
+                    <NewsCard article={article} />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 gap-1.5"
+                    disabled={reanalyzeMutation.isPending}
+                    onClick={() => triggerReanalysis([article.id])}
+                  >
+                    {reanalyzeMutation.isPending && isArticleReanalyzing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                    Re-analyze
+                  </Button>
                 </div>
               );
             })}

@@ -18,6 +18,7 @@ class BrowseAIClient:
     def __init__(self) -> None:
         """Initialize the Browse.ai client."""
         self._api_key = settings.BROWSEAI_API_KEY
+        self._team_id = getattr(settings, "BROWSEAI_TEAM_ID", "")
         self._default_robot_id = settings.BROWSEAI_DEFAULT_ROBOT_ID
         if not self._api_key:
             logger.warning(
@@ -31,6 +32,12 @@ class BrowseAIClient:
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
+
+    def _query_params(self) -> dict[str, str] | None:
+        """Return optional query params for Browse.ai requests."""
+        if self._team_id:
+            return {"teamId": self._team_id}
+        return None
 
     def trigger_robot(self, robot_id: str, input_params: dict) -> str | None:
         """Trigger a Browse.ai robot run.
@@ -51,7 +58,12 @@ class BrowseAIClient:
             url = f"{BROWSEAI_BASE_URL}/robots/{robot_id}/tasks"
             payload = {"inputParameters": input_params}
             with httpx.Client(timeout=30.0) as client:
-                response = client.post(url, headers=self._headers(), json=payload)
+                response = client.post(
+                    url,
+                    headers=self._headers(),
+                    json=payload,
+                    params=self._query_params(),
+                )
                 if response.status_code not in (200, 201):
                     logger.error(
                         "Browse.ai trigger error: %s - %s",
@@ -87,7 +99,11 @@ class BrowseAIClient:
         try:
             url = f"{BROWSEAI_BASE_URL}/robots/{robot_id}/tasks/{task_id}"
             with httpx.Client(timeout=30.0) as client:
-                response = client.get(url, headers=self._headers())
+                response = client.get(
+                    url,
+                    headers=self._headers(),
+                    params=self._query_params(),
+                )
                 if response.status_code != 200:
                     logger.error(
                         "Browse.ai task poll error: %s - %s",

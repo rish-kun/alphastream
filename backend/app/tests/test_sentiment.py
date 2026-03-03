@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -90,3 +90,44 @@ class TestSectorSentiment:
         assert data[0]["sentiment_score"] == 0.45
         assert data[0]["article_count"] == 25
         assert "HDFCBANK" in data[0]["top_stocks"]
+
+
+class TestSentimentReanalysis:
+    async def test_reanalyze_dispatches_existing_articles(
+        self, client: AsyncClient, mock_db: AsyncMock
+    ):
+        article_id = uuid.uuid4()
+        mock_db.execute.return_value = MockResult(data=[article_id])
+
+        with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task:
+            mock_send_task.return_value = MagicMock(id="task-123")
+
+            resp = await client.post(
+                "/api/v1/sentiment/reanalyze",
+                json={"article_ids": [str(article_id)], "force_reanalyze": True},
+            )
+
+        assert resp.status_code == 202
+        data = resp.json()
+        assert data["dispatched"] == 1
+        assert data["task_ids"] == ["task-123"]
+        assert data["skipped_article_ids"] == []
+
+    async def test_reanalyze_skips_missing_articles(
+        self, client: AsyncClient, mock_db: AsyncMock
+    ):
+        article_id = uuid.uuid4()
+        mock_db.execute.return_value = MockResult(data=[])
+
+        with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task:
+            resp = await client.post(
+                "/api/v1/sentiment/reanalyze",
+                json={"article_ids": [str(article_id)], "force_reanalyze": True},
+            )
+
+        assert resp.status_code == 202
+        data = resp.json()
+        assert data["dispatched"] == 0
+        assert data["task_ids"] == []
+        assert data["skipped_article_ids"] == [str(article_id)]
+        mock_send_task.assert_not_called()

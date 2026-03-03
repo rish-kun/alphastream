@@ -43,6 +43,7 @@ export interface NewsFeedParams {
   size?: number;
   source?: string;
   ticker?: string;
+  search?: string;
   start_date?: string;
   end_date?: string;
 }
@@ -54,6 +55,8 @@ export interface TrendingArticle {
   source: string;
   published_at: string;
   sentiment_score: number | null;
+  summary?: string | null;
+  category?: string | null;
   mentions: NewsMention[];
 }
 

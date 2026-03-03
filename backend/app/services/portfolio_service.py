@@ -15,7 +15,6 @@ from app.schemas.portfolio import (
     PortfolioCreate,
     PortfolioDetail,
     PortfolioResponse,
-    PortfolioStockResponse,
     PortfolioUpdate,
 )
 from app.schemas.stock import StockResponse
@@ -52,6 +51,26 @@ class PortfolioService:
         portfolios = result.scalars().all()
 
         return [PortfolioResponse.model_validate(p) for p in portfolios]
+
+    async def get_portfolio_detail(
+        self, user_id: uuid.UUID, portfolio_id: uuid.UUID
+    ) -> PortfolioDetail:
+        """Fetch a single portfolio with its constituent stocks."""
+        stmt = (
+            select(Portfolio)
+            .options(selectinload(Portfolio.stocks).selectinload(PortfolioStock.stock))
+            .where(Portfolio.id == portfolio_id)
+        )
+        result = await self.db.execute(stmt)
+        portfolio = result.scalar_one_or_none()
+
+        if portfolio is None:
+            raise NotFoundError("Portfolio", str(portfolio_id))
+
+        if portfolio.user_id != user_id:
+            raise ForbiddenError("You do not have access to this portfolio")
+
+        return PortfolioDetail.model_validate(portfolio)
 
     async def create_portfolio(
         self, user_id: uuid.UUID, data: PortfolioCreate
@@ -98,7 +117,7 @@ class PortfolioService:
         avg_buy_price: float | None = None,
     ) -> dict:
         """Add a stock to a portfolio."""
-        portfolio = await self._get_portfolio_for_user(user_id, portfolio_id)
+        await self._get_portfolio_for_user(user_id, portfolio_id)
 
         # Find stock by ticker
         stock_stmt = select(Stock).where(func.lower(Stock.ticker) == func.lower(ticker))
@@ -174,7 +193,7 @@ class PortfolioService:
         self, user_id: uuid.UUID, portfolio_id: uuid.UUID
     ) -> dict:
         """Get news related to stocks in a portfolio."""
-        portfolio = await self._get_portfolio_for_user(user_id, portfolio_id)
+        await self._get_portfolio_for_user(user_id, portfolio_id)
 
         # Get all stock_ids in this portfolio
         stock_ids_stmt = select(PortfolioStock.stock_id).where(
@@ -220,7 +239,7 @@ class PortfolioService:
         self, user_id: uuid.UUID, portfolio_id: uuid.UUID
     ) -> dict:
         """Get alpha metrics for a portfolio."""
-        portfolio = await self._get_portfolio_for_user(user_id, portfolio_id)
+        await self._get_portfolio_for_user(user_id, portfolio_id)
 
         # Get all stock_ids in this portfolio
         stock_ids_stmt = select(PortfolioStock.stock_id).where(
@@ -234,30 +253,33 @@ class PortfolioService:
 
         # Get latest alpha metrics for those stocks
         metrics_stmt = (
-            select(AlphaMetric)
+            select(AlphaMetric, Stock.ticker, Stock.company_name)
+            .join(Stock, Stock.id == AlphaMetric.stock_id)
             .where(AlphaMetric.stock_id.in_(stock_ids))
             .order_by(AlphaMetric.computed_at.desc())
             .limit(100)
         )
         metrics_result = await self.db.execute(metrics_stmt)
-        metrics = metrics_result.scalars().all()
+        metrics = metrics_result.all()
 
         return {
             "portfolio_id": str(portfolio_id),
             "metrics": [
                 {
-                    "id": str(m.id),
-                    "stock_id": str(m.stock_id) if m.stock_id else None,
-                    "sector": m.sector,
-                    "expectation_gap": float(m.expectation_gap),
-                    "narrative_velocity": float(m.narrative_velocity),
-                    "sentiment_divergence": float(m.sentiment_divergence),
-                    "composite_score": float(m.composite_score),
-                    "signal": m.signal,
-                    "conviction": float(m.conviction),
-                    "computed_at": m.computed_at.isoformat(),
-                    "window_hours": m.window_hours,
+                    "id": str(metric.id),
+                    "stock_id": str(metric.stock_id) if metric.stock_id else None,
+                    "ticker": ticker,
+                    "company_name": company_name,
+                    "sector": metric.sector,
+                    "expectation_gap": float(metric.expectation_gap),
+                    "narrative_velocity": float(metric.narrative_velocity),
+                    "sentiment_divergence": float(metric.sentiment_divergence),
+                    "composite_score": float(metric.composite_score),
+                    "signal": metric.signal,
+                    "conviction": float(metric.conviction),
+                    "computed_at": metric.computed_at.isoformat(),
+                    "window_hours": metric.window_hours,
                 }
-                for m in metrics
+                for metric, ticker, company_name in metrics
             ],
         }

@@ -15,17 +15,6 @@ import { Grid3x3 } from "lucide-react";
 import { getSectorSentiment } from "@/lib/api";
 import type { SectorSentiment } from "@/lib/api";
 
-// Fallback data
-const fallbackSectors: SectorSentiment[] = [
-  { sector: "Financial Services", avg_sentiment: 0.45, article_count: 28, top_tickers: ["HDFC", "ICICI"] },
-  { sector: "Technology", avg_sentiment: -0.22, article_count: 19, top_tickers: ["TCS", "INFY"] },
-  { sector: "Energy", avg_sentiment: 0.61, article_count: 15, top_tickers: ["RELIANCE", "ONGC"] },
-  { sector: "FMCG", avg_sentiment: 0.12, article_count: 11, top_tickers: ["HUL", "ITC"] },
-  { sector: "Healthcare", avg_sentiment: 0.33, article_count: 9, top_tickers: ["SUNPHARMA", "CIPLA"] },
-  { sector: "Telecom", avg_sentiment: -0.08, article_count: 7, top_tickers: ["AIRTEL", "JIO"] },
-  { sector: "Automobiles", avg_sentiment: 0.28, article_count: 12, top_tickers: ["TATAMOTORS", "M&M"] },
-  { sector: "Metals & Mining", avg_sentiment: -0.35, article_count: 8, top_tickers: ["TATASTEEL", "COAL"] },
-];
 
 function getSentimentColor(score: number): string {
   if (score > 0.3) return "text-green-600 dark:text-green-400";
@@ -51,13 +40,13 @@ function getSentimentBgIntensity(score: number): string {
 }
 
 export function SectorHeatmap() {
-  const { data: sectors, isLoading } = useQuery({
+  const { data: sectors, isLoading, isError } = useQuery({
     queryKey: ["sector-sentiment"],
     queryFn: getSectorSentiment,
     refetchInterval: 120000,
   });
 
-  const sectorData = sectors ?? fallbackSectors;
+  const sectorData = sectors ?? [];
 
   if (isLoading) {
     return (
@@ -71,6 +60,29 @@ export function SectorHeatmap() {
             {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-24 w-full rounded-lg" />
             ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError || sectorData.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Grid3x3 className="h-5 w-5" />
+            Sector Sentiment
+          </CardTitle>
+          <CardDescription>
+            Sentiment heatmap by market sector
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+            <Grid3x3 className="mb-2 h-8 w-8 opacity-50" />
+            <p className="text-sm">No sector sentiment data available</p>
+            <p className="text-xs">Data will appear once news articles are analyzed</p>
           </div>
         </CardContent>
       </Card>

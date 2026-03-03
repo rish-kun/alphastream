@@ -295,6 +295,7 @@ class TestBrowseAIClient:
     def test_trigger_robot_returns_task_id(self, MockHTTPClient, mock_settings):
         """trigger_robot() should return the task ID from Browse.ai."""
         mock_settings.BROWSEAI_API_KEY = "test-key"
+        mock_settings.BROWSEAI_TEAM_ID = "team-123"
         mock_settings.BROWSEAI_DEFAULT_ROBOT_ID = "robot-1"
 
         mock_response = MagicMock()
@@ -313,6 +314,9 @@ class TestBrowseAIClient:
         task_id = client.trigger_robot("robot-1", {"url": "http://x.com"})
 
         assert task_id == "task-123"
+        mock_client_instance.post.assert_called_once()
+        call_kwargs = mock_client_instance.post.call_args.kwargs
+        assert call_kwargs.get("params") == {"teamId": "team-123"}
 
     @patch("pipeline.scrapers.browseai_client.settings")
     @patch("pipeline.scrapers.browseai_client.httpx.Client")
@@ -321,6 +325,7 @@ class TestBrowseAIClient:
     ):
         """trigger_robot() returns None on non-200 response."""
         mock_settings.BROWSEAI_API_KEY = "test-key"
+        mock_settings.BROWSEAI_TEAM_ID = "team-123"
         mock_settings.BROWSEAI_DEFAULT_ROBOT_ID = "robot-1"
 
         mock_response = MagicMock()
@@ -344,6 +349,7 @@ class TestBrowseAIClient:
     def test_trigger_robot_returns_none_without_api_key(self, mock_settings):
         """trigger_robot() returns None when API key is not set."""
         mock_settings.BROWSEAI_API_KEY = ""
+        mock_settings.BROWSEAI_TEAM_ID = ""
         mock_settings.BROWSEAI_DEFAULT_ROBOT_ID = ""
 
         from pipeline.scrapers.browseai_client import BrowseAIClient
@@ -352,6 +358,34 @@ class TestBrowseAIClient:
         task_id = client.trigger_robot("robot-1", {"url": "http://x.com"})
 
         assert task_id is None
+
+    @patch("pipeline.scrapers.browseai_client.settings")
+    @patch("pipeline.scrapers.browseai_client.httpx.Client")
+    def test_get_task_result_uses_team_id_param(self, MockHTTPClient, mock_settings):
+        """get_task_result() should pass teamId query param when configured."""
+        mock_settings.BROWSEAI_API_KEY = "test-key"
+        mock_settings.BROWSEAI_TEAM_ID = "team-123"
+        mock_settings.BROWSEAI_DEFAULT_ROBOT_ID = "robot-1"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"result": {"status": "successful"}}
+
+        mock_client_instance = MagicMock()
+        mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+        mock_client_instance.__exit__ = MagicMock(return_value=False)
+        mock_client_instance.get.return_value = mock_response
+        MockHTTPClient.return_value = mock_client_instance
+
+        from pipeline.scrapers.browseai_client import BrowseAIClient
+
+        client = BrowseAIClient()
+        result = client.get_task_result("robot-1", "task-123")
+
+        assert result == {"status": "successful"}
+        mock_client_instance.get.assert_called_once()
+        call_kwargs = mock_client_instance.get.call_args.kwargs
+        assert call_kwargs.get("params") == {"teamId": "team-123"}
 
 
 # ---------------------------------------------------------------------------

@@ -15,7 +15,6 @@ from sqlalchemy import text
 
 from pipeline.celery_app import app
 from pipeline.database import get_db
-from pipeline.config import settings
 from pipeline.utils.deduplication import compute_content_hash
 from pipeline.utils.publisher import publish_event
 
@@ -25,6 +24,16 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Helper: store deduplicated research articles
 # ---------------------------------------------------------------------------
+
+
+def _build_research_summary(content: str, source_query: str) -> str | None:
+    snippet = " ".join((content or "").split())
+    if snippet:
+        snippet = snippet[:400]
+    summary_prefix = f"Deep research query: {source_query}. "
+    if not snippet:
+        return summary_prefix.strip()
+    return f"{summary_prefix}{snippet}"
 
 
 def _store_research_articles(articles: list[dict], source_query: str) -> int:
@@ -72,29 +81,36 @@ def _store_research_articles(articles: list[dict], source_query: str) -> int:
                             published_at.replace("Z", "+00:00")
                         )
                     except (ValueError, TypeError):
-                        published_at = None
+                        published_at = datetime.now(UTC)
+                elif not isinstance(published_at, datetime):
+                    published_at = datetime.now(UTC)
 
                 article_id = str(uuid.uuid4())
                 now = datetime.now(UTC)
+                summary = _build_research_summary(content, source_query)
+                normalized_source = source_name or "Deep Research"
+                content_hash = compute_content_hash(f"{title}|{content}|{url}")
 
                 db.execute(
                     text("""
                         INSERT INTO news_articles
-                            (id, title, url, source, published_at,
-                             scraped_at, full_text, source_query)
+                            (id, title, summary, url, source, published_at,
+                             scraped_at, full_text, content_hash, category)
                         VALUES
-                            (:id, :title, :url, :source, :published_at,
-                             :scraped_at, :full_text, :source_query)
+                            (:id, :title, :summary, :url, :source, :published_at,
+                             :scraped_at, :full_text, :content_hash, :category)
                     """),
                     {
                         "id": article_id,
                         "title": title,
+                        "summary": summary,
                         "url": url,
-                        "source": source_name,
+                        "source": normalized_source[:50],
                         "published_at": published_at,
                         "scraped_at": now,
                         "full_text": content,
-                        "source_query": source_query,
+                        "content_hash": content_hash,
+                        "category": "deep_research",
                     },
                 )
                 new_count += 1

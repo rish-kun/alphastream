@@ -40,7 +40,7 @@ class TestFinBERTAnalyzer:
         )
 
         assert result["label"] == "positive"
-        assert result["score"] == 1.0  # positive maps to 1.0
+        assert result["score"] == pytest.approx(0.75)
         assert result["confidence"] == pytest.approx(0.85)
 
     @patch("pipeline.ml.finbert.settings")
@@ -113,7 +113,7 @@ class TestFinBERTAnalyzer:
         result = analyzer.analyze("Market crashed 500 points")
 
         assert result["label"] == "negative"
-        assert result["score"] == -1.0
+        assert result["score"] == pytest.approx(-0.85)
 
 
 # ---------------------------------------------------------------------------

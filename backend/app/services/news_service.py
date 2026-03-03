@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
@@ -19,7 +19,9 @@ class NewsService:
     async def get_news_feed(self, query: NewsFeedQuery) -> NewsListResponse:
         """Get paginated news feed with optional filters."""
         base_stmt = select(NewsArticle)
-        count_stmt = select(func.count()).select_from(NewsArticle)
+        count_stmt = select(func.count(func.distinct(NewsArticle.id))).select_from(
+            NewsArticle
+        )
 
         conditions = []
 
@@ -34,6 +36,28 @@ class NewsService:
 
         if query.to_date:
             conditions.append(NewsArticle.published_at <= query.to_date)
+
+        if query.search:
+            search_term = query.search.strip()
+            if search_term:
+                pattern = f"%{search_term}%"
+                conditions.append(
+                    or_(
+                        NewsArticle.title.ilike(pattern),
+                        NewsArticle.summary.ilike(pattern),
+                        NewsArticle.full_text.ilike(pattern),
+                        NewsArticle.category.ilike(pattern),
+                        NewsArticle.source.ilike(pattern),
+                        NewsArticle.mentions.any(
+                            ArticleStockMention.stock.has(
+                                or_(
+                                    Stock.ticker.ilike(pattern),
+                                    Stock.company_name.ilike(pattern),
+                                )
+                            )
+                        ),
+                    )
+                )
 
         if query.ticker:
             # Join through article_stock_mentions to filter by ticker
@@ -52,6 +76,7 @@ class NewsService:
                 Stock.id == ArticleStockMention.stock_id,
             )
             conditions.append(func.lower(Stock.ticker) == func.lower(query.ticker))
+            base_stmt = base_stmt.distinct()
 
         if conditions:
             base_stmt = base_stmt.where(and_(*conditions))
@@ -79,10 +104,10 @@ class NewsService:
         )
 
     async def get_trending_news(self, limit: int = 10) -> list[NewsArticleResponse]:
-        """Get trending news articles (most recent with sentiment analyses)."""
+        """Get trending news articles (most recent, with or without sentiment analyses)."""
         stmt = (
             select(NewsArticle)
-            .join(
+            .outerjoin(
                 SentimentAnalysis,
                 SentimentAnalysis.article_id == NewsArticle.id,
             )

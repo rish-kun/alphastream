@@ -69,6 +69,22 @@ class TestGetNewsFeed:
 
         assert resp.status_code == 200
 
+    async def test_filter_by_keyword(self, client: AsyncClient, mock_db: AsyncMock):
+        with patch("app.api.v1.news.NewsService") as MockService:
+            instance = MockService.return_value
+            instance.get_news_feed = AsyncMock(
+                return_value=NewsListResponse(
+                    articles=[],
+                    total=0,
+                    page=1,
+                    page_size=20,
+                )
+            )
+
+            resp = await client.get("/api/v1/news/?search=gold")
+
+        assert resp.status_code == 200
+
     async def test_pagination_params(self, client: AsyncClient, mock_db: AsyncMock):
         with patch("app.api.v1.news.NewsService") as MockService:
             instance = MockService.return_value

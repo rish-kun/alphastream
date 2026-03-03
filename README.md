@@ -480,6 +480,7 @@ These enable the "Extensive Research" toggle on stock, portfolio, and news pages
 |----------|-------------|
 | `FIRECRAWL_API_KEY` | Firecrawl API key. Get one at https://www.firecrawl.dev/ |
 | `BROWSEAI_API_KEY` | Browse.ai API key. Get one at https://www.browse.ai/ |
+| `BROWSEAI_TEAM_ID` | Browse.ai team ID used when querying robot/task APIs |
 | `BROWSEAI_DEFAULT_ROBOT_ID` | Browse.ai robot ID for your configured scraping robot |
 | `THUNDERBIT_API_KEY` | Thunderbit API key. Get one at https://thunderbit.com/ |
 

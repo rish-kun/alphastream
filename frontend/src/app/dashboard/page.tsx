@@ -4,6 +4,7 @@ import { LiveFeed } from "@/components/dashboard/live-feed";
 import { SentimentChart } from "@/components/dashboard/sentiment-chart";
 import { AlphaMetrics } from "@/components/dashboard/alpha-metrics";
 import { SectorHeatmap } from "@/components/dashboard/sector-heatmap";
+import { TopicOverview } from "@/components/dashboard/topic-overview";
 
 export default function DashboardPage() {
   return (
@@ -31,9 +32,14 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Live Feed */}
-      <div>
-        <LiveFeed />
+      {/* Live Feed + Topic Categories */}
+      <div className="grid gap-4 lg:grid-cols-7">
+        <div className="lg:col-span-4">
+          <LiveFeed />
+        </div>
+        <div className="lg:col-span-3">
+          <TopicOverview />
+        </div>
       </div>
     </div>
   );

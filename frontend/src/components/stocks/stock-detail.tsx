@@ -33,6 +33,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import { getStock, getStockNews, getStockAlpha } from "@/lib/api";
 import { useWebSocketSubscription } from "@/hooks/use-websocket";
 import { ResearchToggle } from "@/components/research/research-toggle";
+import { SentimentBadge } from "@/components/news/sentiment-badge";
 import type { SignalType } from "@/types/stock";
 import type { StockAlphaMetric } from "@/lib/api";
 
@@ -110,13 +111,12 @@ function MetricBar({
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{label}</span>
         <span
-          className={`text-sm font-semibold tabular-nums ${
-            isPositive
-              ? "text-green-600 dark:text-green-400"
-              : value < 0
-                ? "text-red-600 dark:text-red-400"
-                : "text-muted-foreground"
-          }`}
+          className={`text-sm font-semibold tabular-nums ${isPositive
+            ? "text-green-600 dark:text-green-400"
+            : value < 0
+              ? "text-red-600 dark:text-red-400"
+              : "text-muted-foreground"
+            }`}
         >
           {value > 0 ? "+" : ""}
           {value.toFixed(3)}
@@ -124,9 +124,8 @@ function MetricBar({
       </div>
       <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
         <div
-          className={`h-full rounded-full transition-all ${
-            isPositive ? "bg-green-500" : value < 0 ? "bg-red-500" : "bg-gray-400"
-          }`}
+          className={`h-full rounded-full transition-all ${isPositive ? "bg-green-500" : value < 0 ? "bg-red-500" : "bg-gray-400"
+            }`}
           style={{ width: `${normalized}%` }}
         />
       </div>
@@ -323,13 +322,12 @@ export function StockDetail({ ticker }: StockDetailProps) {
               <Skeleton className="h-8 w-20" />
             ) : latestAlpha ? (
               <p
-                className={`text-2xl font-bold tabular-nums ${
-                  latestAlpha.composite_score > 0
-                    ? "text-green-600 dark:text-green-400"
-                    : latestAlpha.composite_score < 0
-                      ? "text-red-600 dark:text-red-400"
-                      : ""
-                }`}
+                className={`text-2xl font-bold tabular-nums ${latestAlpha.composite_score > 0
+                  ? "text-green-600 dark:text-green-400"
+                  : latestAlpha.composite_score < 0
+                    ? "text-red-600 dark:text-red-400"
+                    : ""
+                  }`}
               >
                 {latestAlpha.composite_score > 0 ? "+" : ""}
                 {latestAlpha.composite_score.toFixed(3)}
@@ -516,46 +514,42 @@ export function StockDetail({ ticker }: StockDetailProps) {
                             })}
                           </span>
                           <span
-                            className={`text-right tabular-nums ${
-                              m.expectation_gap > 0
-                                ? "text-green-600"
-                                : m.expectation_gap < 0
-                                  ? "text-red-600"
-                                  : ""
-                            }`}
+                            className={`text-right tabular-nums ${m.expectation_gap > 0
+                              ? "text-green-600"
+                              : m.expectation_gap < 0
+                                ? "text-red-600"
+                                : ""
+                              }`}
                           >
                             {m.expectation_gap.toFixed(3)}
                           </span>
                           <span
-                            className={`text-right tabular-nums ${
-                              m.narrative_velocity > 0
-                                ? "text-green-600"
-                                : m.narrative_velocity < 0
-                                  ? "text-red-600"
-                                  : ""
-                            }`}
+                            className={`text-right tabular-nums ${m.narrative_velocity > 0
+                              ? "text-green-600"
+                              : m.narrative_velocity < 0
+                                ? "text-red-600"
+                                : ""
+                              }`}
                           >
                             {m.narrative_velocity.toFixed(3)}
                           </span>
                           <span
-                            className={`text-right tabular-nums ${
-                              m.sentiment_divergence > 0
-                                ? "text-green-600"
-                                : m.sentiment_divergence < 0
-                                  ? "text-red-600"
-                                  : ""
-                            }`}
+                            className={`text-right tabular-nums ${m.sentiment_divergence > 0
+                              ? "text-green-600"
+                              : m.sentiment_divergence < 0
+                                ? "text-red-600"
+                                : ""
+                              }`}
                           >
                             {m.sentiment_divergence.toFixed(3)}
                           </span>
                           <span
-                            className={`text-right font-medium tabular-nums ${
-                              m.composite_score > 0
-                                ? "text-green-600"
-                                : m.composite_score < 0
-                                  ? "text-red-600"
-                                  : ""
-                            }`}
+                            className={`text-right font-medium tabular-nums ${m.composite_score > 0
+                              ? "text-green-600"
+                              : m.composite_score < 0
+                                ? "text-red-600"
+                                : ""
+                              }`}
                           >
                             {m.composite_score.toFixed(3)}
                           </span>
@@ -617,19 +611,11 @@ export function StockDetail({ ticker }: StockDetailProps) {
                           {article.sentiment_score != null && (
                             <>
                               <span className="text-muted-foreground/40">|</span>
-                              <span
-                                className={`font-medium ${
-                                  article.sentiment_score > 0
-                                    ? "text-green-600"
-                                    : article.sentiment_score < 0
-                                      ? "text-red-600"
-                                      : "text-muted-foreground"
-                                }`}
-                              >
-                                Sentiment:{" "}
-                                {article.sentiment_score > 0 ? "+" : ""}
-                                {article.sentiment_score.toFixed(2)}
-                              </span>
+                              <SentimentBadge
+                                score={article.sentiment_score}
+                                size="sm"
+                                showValue={true}
+                              />
                             </>
                           )}
                         </div>

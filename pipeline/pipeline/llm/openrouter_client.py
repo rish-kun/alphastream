@@ -4,6 +4,7 @@ import json
 import logging
 import re
 
+from pipeline.config import settings
 from pipeline.llm.rate_limiter import KeyRotator, RateLimiter
 
 logger = logging.getLogger(__name__)
@@ -16,15 +17,24 @@ class OpenRouterClient:
     with multiple API keys for rotation.
     """
 
-    def __init__(self, api_keys: list[str]) -> None:
+    def __init__(
+        self,
+        api_keys: list[str],
+        model_name: str | None = None,
+        max_input_chars: int | None = None,
+    ) -> None:
         """Initialize the OpenRouter client.
 
         Args:
             api_keys: List of OpenRouter API keys for rotation.
         """
         self._key_rotator = KeyRotator(api_keys)
-        self._rate_limiter = RateLimiter(max_requests_per_minute=15)
+        self._rate_limiter = RateLimiter(
+            max_requests_per_minute=settings.LLM_REQUESTS_PER_MINUTE
+        )
         self._api_keys = api_keys
+        self._model_name = model_name or settings.SENTIMENT_OPENROUTER_MODEL
+        self._max_input_chars = max_input_chars or settings.SENTIMENT_LLM_MAX_CHARS
         logger.info("OpenRouterClient initialized with %d API keys", len(api_keys))
 
     def _rotate_key(self) -> str:
@@ -69,17 +79,20 @@ class OpenRouterClient:
             from pipeline.llm.prompts import SENTIMENT_ANALYSIS_PROMPT
 
             prompt = SENTIMENT_ANALYSIS_PROMPT.format(
-                article_text=text[:3000], context=context
+                article_text=text[: self._max_input_chars], context=context
             )
             response = client.chat.completions.create(
-                model="google/gemini-2.0-flash-001",
+                model=self._model_name,
                 messages=[{"role": "user", "content": prompt}],
             )
 
-            result = self._parse_json_response(response.choices[0].message.content)
+            result = self._normalize_response(
+                self._parse_json_response(response.choices[0].message.content)
+            )
             logger.info("OpenRouter sentiment analysis completed successfully")
             return result
         except Exception as e:
+            self._key_rotator.mark_failed(api_key)
             logger.error("OpenRouter API call failed: %s", str(e))
             return self._get_fallback_response(str(e))
 
@@ -122,3 +135,38 @@ class OpenRouterClient:
             "mentioned_tickers": [],
             "key_themes": [],
         }
+
+    def _normalize_response(self, result: dict) -> dict:
+        score = self._clamp(self._to_float(result.get("sentiment_score")), -1.0, 1.0)
+        confidence = self._clamp(
+            self._to_float(result.get("confidence")),
+            0.0,
+            1.0,
+        )
+        timeline = str(result.get("impact_timeline") or "unknown").strip().lower()
+        if timeline not in {"immediate", "short_term", "long_term"}:
+            timeline = "unknown"
+        return {
+            "sentiment_score": score,
+            "confidence": confidence,
+            "explanation": str(result.get("explanation") or "").strip()
+            or "No explanation provided",
+            "impact_timeline": timeline,
+            "affected_sectors": self._normalize_list(result.get("affected_sectors")),
+            "mentioned_tickers": self._normalize_list(result.get("mentioned_tickers")),
+            "key_themes": self._normalize_list(result.get("key_themes")),
+        }
+
+    def _normalize_list(self, value: object) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        return [str(item).strip() for item in value if str(item).strip()]
+
+    def _to_float(self, value: object) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _clamp(self, value: float, lower: float, upper: float) -> float:
+        return max(lower, min(upper, value))

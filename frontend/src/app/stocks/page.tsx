@@ -21,7 +21,7 @@ export default function StocksPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch some popular stocks (empty query returns popular/all)
+  // Empty query now returns stocks ranked by related-article coverage.
   const { data: popularData, isLoading: isPopularLoading } = useQuery({
     queryKey: ["stocks", "popular"],
     queryFn: () => searchStocks(""),
@@ -88,7 +88,12 @@ export default function StocksPage() {
       <section>
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="h-5 w-5 text-muted-foreground" />
-          <h2 className="text-xl font-semibold">Popular Stocks</h2>
+          <div>
+            <h2 className="text-xl font-semibold">Most Covered Stocks</h2>
+            <p className="text-sm text-muted-foreground">
+              Ranked by number of related news articles
+            </p>
+          </div>
         </div>
         {isPopularLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

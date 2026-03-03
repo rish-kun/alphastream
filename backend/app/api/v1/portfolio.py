@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.portfolio import (
     PortfolioCreate,
+    PortfolioDetail,
     PortfolioResponse,
     PortfolioStockAdd,
     PortfolioUpdate,
@@ -27,6 +28,16 @@ async def list_portfolios(
 ) -> list[PortfolioResponse]:
     service = PortfolioService(db)
     return await service.list_portfolios(current_user.id)
+
+
+@router.get("/{id}", response_model=PortfolioDetail)
+async def get_portfolio(
+    id: uuid.UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)] = None,
+) -> PortfolioDetail:
+    service = PortfolioService(db)
+    return await service.get_portfolio_detail(current_user.id, id)
 
 
 @router.post("/", response_model=PortfolioResponse, status_code=201)

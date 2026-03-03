@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from celery import Celery
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
+from app.config import settings
 from app.database import get_db
 from app.models.news import ArticleStockMention, NewsArticle
 from app.models.sentiment import AlphaMetric, SentimentAnalysis
 from app.models.stock import Stock
+from app.models.user import User
 from app.schemas.sentiment import (
     AlphaMetricResponse,
     SectorSentiment,
@@ -18,6 +24,23 @@ from app.schemas.sentiment import (
 )
 
 router = APIRouter(prefix="/sentiment", tags=["sentiment"])
+
+_celery_app = Celery(
+    "alphastream-sentiment",
+    broker=settings.REDIS_URL,
+    backend=settings.REDIS_URL,
+)
+
+
+class SentimentReanalysisRequest(BaseModel):
+    article_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=100)
+    force_reanalyze: bool = True
+
+
+class SentimentReanalysisResponse(BaseModel):
+    dispatched: int
+    task_ids: list[str]
+    skipped_article_ids: list[uuid.UUID]
 
 
 @router.get("/overview", response_model=SentimentOverview)
@@ -94,6 +117,61 @@ async def get_market_sentiment(
     )
 
 
+@router.get("/top-signals", response_model=dict)
+async def get_top_signals(
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+    db: Annotated[AsyncSession, Depends(get_db)] = None,
+) -> dict:
+    # Pick the most recent metric per stock, then rank by composite score.
+    ranked_metrics = (
+        select(
+            AlphaMetric.id.label("metric_id"),
+            func.row_number()
+            .over(
+                partition_by=AlphaMetric.stock_id,
+                order_by=(
+                    AlphaMetric.computed_at.desc(),
+                    AlphaMetric.window_hours.asc(),
+                ),
+            )
+            .label("row_num"),
+        )
+        .where(AlphaMetric.stock_id.isnot(None))
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            Stock.ticker,
+            Stock.company_name,
+            AlphaMetric.composite_score,
+            AlphaMetric.signal,
+            AlphaMetric.conviction,
+        )
+        .join(ranked_metrics, ranked_metrics.c.metric_id == AlphaMetric.id)
+        .join(Stock, Stock.id == AlphaMetric.stock_id)
+        .where(ranked_metrics.c.row_num == 1)
+        .order_by(AlphaMetric.composite_score.desc())
+        .limit(limit)
+    )
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return {
+        "signals": [
+            {
+                "ticker": row[0],
+                "company_name": row[1],
+                "composite_score": float(row[2]) if row[2] is not None else 0.0,
+                "signal": row[3],
+                "conviction": float(row[4]) if row[4] is not None else 0.0,
+            }
+            for row in rows
+        ]
+    }
+
+
 @router.get("/sectors", response_model=list[SectorSentiment])
 async def get_sector_sentiment(
     db: Annotated[AsyncSession, Depends(get_db)] = None,
@@ -152,3 +230,37 @@ async def get_sector_sentiment(
         )
 
     return results
+
+
+@router.post("/reanalyze", response_model=SentimentReanalysisResponse, status_code=202)
+async def reanalyze_articles_sentiment(
+    body: SentimentReanalysisRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)] = None,
+) -> SentimentReanalysisResponse:
+    existing_rows = await db.execute(
+        select(NewsArticle.id).where(NewsArticle.id.in_(body.article_ids))
+    )
+    existing_ids = {str(article_id) for article_id in existing_rows.scalars().all()}
+
+    task_ids: list[str] = []
+    skipped: list[uuid.UUID] = []
+
+    for article_id in body.article_ids:
+        article_id_str = str(article_id)
+        if article_id_str not in existing_ids:
+            skipped.append(article_id)
+            continue
+
+        task = _celery_app.send_task(
+            "pipeline.tasks.sentiment_analysis.analyze_article",
+            args=[article_id_str],
+            kwargs={"force_reanalyze": body.force_reanalyze},
+        )
+        task_ids.append(task.id)
+
+    return SentimentReanalysisResponse(
+        dispatched=len(task_ids),
+        task_ids=task_ids,
+        skipped_article_ids=skipped,
+    )

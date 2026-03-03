@@ -14,7 +14,7 @@ from app.core.security import (
     verify_token,
 )
 from app.models.user import User
-from app.schemas.user import TokenResponse, UserCreate
+from app.schemas.user import TokenResponse, UserCreate, UserResponse
 
 
 class AuthService:
@@ -60,7 +60,17 @@ class AuthService:
         """Create access and refresh tokens for a user."""
         access_token = create_access_token(data={"sub": str(user.id)})
         refresh = create_refresh_token(data={"sub": str(user.id)})
-        return TokenResponse(access_token=access_token, refresh_token=refresh)
+        user_response = UserResponse(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            oauth_provider=user.oauth_provider,
+            is_active=user.is_active,
+            created_at=user.created_at,
+        )
+        return TokenResponse(
+            access_token=access_token, refresh_token=refresh, user=user_response
+        )
 
     async def refresh_token(self, refresh_token: str) -> TokenResponse:
         """Refresh an access token using a refresh token."""

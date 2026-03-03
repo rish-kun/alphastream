@@ -35,6 +35,29 @@ class PipelineSettings(BaseSettings):
             return v.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
         return v
 
+    @field_validator("SENTIMENT_LLM_PROVIDER_ORDER", mode="before")
+    @classmethod
+    def parse_provider_order(cls, v):
+        if isinstance(v, str):
+            if not v.strip():
+                return ["gemini", "openrouter"]
+            import json
+
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return [
+                        str(item).strip().lower()
+                        for item in parsed
+                        if str(item).strip()
+                    ]
+            except json.JSONDecodeError:
+                pass
+            return [item.strip().lower() for item in v.split(",") if item.strip()]
+        if isinstance(v, list):
+            return [str(item).strip().lower() for item in v if str(item).strip()]
+        return ["gemini", "openrouter"]
+
     # Reddit
     REDDIT_CLIENT_ID: str = ""
     REDDIT_CLIENT_SECRET: str = ""
@@ -50,10 +73,25 @@ class PipelineSettings(BaseSettings):
     # ML
     FINBERT_MODEL: str = "ProsusAI/finbert"
     SPACY_MODEL: str = "en_core_web_sm"
+    SENTIMENT_FINBERT_MODEL: str = "ProsusAI/finbert"
+    SENTIMENT_GEMINI_MODEL: str = "gemini-3-flash-preview"
+    SENTIMENT_OPENROUTER_MODEL: str = "stepfun/step-3.5-flash:free"
+    SENTIMENT_LLM_PROVIDER_ORDER: list[str] = ["gemini", "openrouter"]
+    SENTIMENT_FINBERT_MAX_CHARS: int = 3000
+    SENTIMENT_FINBERT_MAX_CHUNKS: int = 3
+    SENTIMENT_LLM_MAX_CHARS: int = 2200
+    SENTIMENT_LLM_TRIGGER_CONFIDENCE: float = 0.70
+    SENTIMENT_LLM_TRIGGER_NEUTRAL_BAND: float = 0.20
+    SENTIMENT_LOCAL_WEIGHT: float = 0.65
+    SENTIMENT_LLM_WEIGHT: float = 0.35
+    SENTIMENT_ENABLE_LLM: bool = True
+    SENTIMENT_PENDING_BATCH_SIZE: int = 50
+    SENTIMENT_REANALYZE_BATCH_LIMIT: int = 100
 
     # Extensive Research API Keys
     FIRECRAWL_API_KEY: str = ""
     BROWSEAI_API_KEY: str = ""
+    BROWSEAI_TEAM_ID: str = ""
     BROWSEAI_DEFAULT_ROBOT_ID: str = ""
     THUNDERBIT_API_KEY: str = ""
 

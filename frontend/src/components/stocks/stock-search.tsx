@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Loader2, X } from "lucide-react";
+import { Search, Loader2, X, Newspaper } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -14,7 +14,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockCardCompact } from "@/components/stocks/stock-card";
-import { searchStocks, getSectors } from "@/lib/api";
+import { NewsCard } from "@/components/news/news-card";
+import { searchStocks, getNewsFeed, getSectors } from "@/lib/api";
 import { useDebounce } from "@/hooks/use-debounce";
 import type { Stock } from "@/types/stock";
 
@@ -27,6 +28,7 @@ export function StockSearch({ onSelect, compact = false }: StockSearchProps) {
   const [query, setQuery] = useState("");
   const [sectorFilter, setSectorFilter] = useState("all");
   const debouncedQuery = useDebounce(query, 300);
+  const shouldShowNewsResults = !compact && !onSelect;
 
   const {
     data: searchResult,
@@ -46,6 +48,20 @@ export function StockSearch({ onSelect, compact = false }: StockSearchProps) {
   });
 
   const sectors = sectorsData ?? [];
+  const {
+    data: newsSearchResult,
+    isLoading: isNewsSearching,
+  } = useQuery({
+    queryKey: ["news", "stocks-search", debouncedQuery],
+    queryFn: () =>
+      getNewsFeed({
+        page: 1,
+        size: 6,
+        search: debouncedQuery,
+      }),
+    enabled: shouldShowNewsResults && debouncedQuery.length >= 2,
+    staleTime: 30 * 1000,
+  });
 
   const filteredStocks =
     sectorFilter === "all"
@@ -65,7 +81,7 @@ export function StockSearch({ onSelect, compact = false }: StockSearchProps) {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by ticker or company name..."
+            placeholder="Search stocks or topics (e.g. gold, silver, crude oil)..."
             className="pl-9 pr-9"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -104,10 +120,11 @@ export function StockSearch({ onSelect, compact = false }: StockSearchProps) {
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
           <Search className="mb-3 h-10 w-10 text-muted-foreground/50" />
           <p className="text-sm font-medium text-muted-foreground">
-            Search for stocks by name or ticker
+            Search for stocks, metals, or commodities
           </p>
           <p className="text-xs text-muted-foreground/70 mt-1">
-            Try &quot;Reliance&quot;, &quot;TCS&quot;, or &quot;HDFC&quot;
+            Try &quot;Reliance&quot;, &quot;TCS&quot;, &quot;gold&quot;, or
+            &quot;crude oil&quot;
           </p>
         </div>
       )}
@@ -137,6 +154,11 @@ export function StockSearch({ onSelect, compact = false }: StockSearchProps) {
 
       {!isSearching && filteredStocks.length > 0 && (
         <div className="space-y-1">
+          {shouldShowNewsResults && (
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Stocks
+            </p>
+          )}
           {filteredStocks.map((stock) =>
             onSelect ? (
               <button
@@ -180,9 +202,50 @@ export function StockSearch({ onSelect, compact = false }: StockSearchProps) {
         </div>
       )}
 
+      {shouldShowNewsResults && debouncedQuery.length >= 2 && (
+        <div className="space-y-2">
+          <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <Newspaper className="h-3.5 w-3.5" />
+            Related News
+          </p>
+
+          {isNewsSearching ? (
+            <div className="space-y-1">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-64" />
+                    <Skeleton className="h-3 w-40" />
+                  </div>
+                  <Skeleton className="h-5 w-14 rounded-full" />
+                </div>
+              ))}
+            </div>
+          ) : (newsSearchResult?.items?.length ?? 0) > 0 ? (
+            <div className="space-y-1">
+              {(newsSearchResult?.items ?? []).map((article) => (
+                <NewsCard key={article.id} article={article} variant="compact" />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed py-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                No related news found for &quot;{debouncedQuery}&quot;
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {!isSearching &&
         debouncedQuery.length >= 1 &&
-        filteredStocks.length === 0 && (
+        filteredStocks.length === 0 &&
+        (!shouldShowNewsResults ||
+          debouncedQuery.length < 2 ||
+          (!isNewsSearching && (newsSearchResult?.items?.length ?? 0) === 0)) && (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-8 text-center">
             <p className="text-sm text-muted-foreground">
               No stocks found for &quot;{debouncedQuery}&quot;

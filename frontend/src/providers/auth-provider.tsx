@@ -1,23 +1,8 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-} from "react";
-import {
-  login as apiLogin,
-  register as apiRegister,
-  getCurrentUser,
-} from "@/lib/api";
-import {
-  getAccessToken,
-  setTokens,
-  clearTokens,
-} from "@/lib/auth";
-import type { UserProfile } from "@/types/api";
+import { SessionProvider } from "next-auth/react";
+import { useSession, signIn, signOut } from "next-auth/react";
+import type { UserProfile } from "@/lib/api";
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -32,71 +17,77 @@ interface AuthContextType {
   ) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const token = getAccessToken();
-    if (token) {
-      getCurrentUser()
-        .then(setUser)
-        .catch(() => {
-          clearTokens();
-        })
-        .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await apiLogin({ email, password });
-    setTokens(res.access_token, res.refresh_token);
-    setUser(res.user);
-  }, []);
-
-  const logout = useCallback(() => {
-    clearTokens();
-    setUser(null);
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
-  }, []);
-
-  const register = useCallback(
-    async (email: string, password: string, fullName: string) => {
-      const res = await apiRegister({
-        email,
-        password,
-        full_name: fullName,
-      });
-      setTokens(res.access_token, res.refresh_token);
-      setUser(res.user);
-    },
-    []
+  return (
+    <SessionProvider>
+      <AuthProviderInternal>{children}</AuthProviderInternal>
+    </SessionProvider>
   );
+}
+
+function AuthProviderInternal({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
+  
+  const isLoading = status === "loading";
+  const isAuthenticated = status === "authenticated";
+  const user = session?.user ? {
+    id: (session.user as Record<string, unknown>).id as string || "",
+    email: session.user.email || "",
+    full_name: session.user.name || "",
+    is_active: true,
+    created_at: "",
+  } : null;
+
+  const login = async (email: string, password: string) => {
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+    if (result?.error) {
+      throw new Error("Invalid email or password");
+    }
+  };
+
+  const logout = () => {
+    signOut({ callbackUrl: "/login" });
+  };
+
+  const register = async (email: string, password: string, fullName: string) => {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, full_name: fullName }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Registration failed");
+    }
+    await login(email, password);
+  };
 
   return (
-    <AuthContext.Provider
+    <AuthContextInternal.Provider
       value={{
         user,
         isLoading,
-        isAuthenticated: !!user,
+        isAuthenticated,
         login,
         logout,
         register,
       }}
     >
       {children}
-    </AuthContext.Provider>
+    </AuthContextInternal.Provider>
   );
 }
 
+import { createContext, useContext } from "react";
+
+const AuthContextInternal = createContext<AuthContextType | undefined>(undefined);
+
 export function useAuth() {
-  const context = useContext(AuthContext);
+  const context = useContext(AuthContextInternal);
   if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -22,10 +22,13 @@ import {
   TrendingUp,
   BarChart3,
   AlertCircle,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
-import { getNewsArticle } from "@/lib/api";
+import { getNewsArticle, reanalyzeSentiment } from "@/lib/api";
 import type { NewsArticleDetail, SentimentAnalysisEntry } from "@/types/news";
+import { toast } from "sonner";
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-IN", {
@@ -57,6 +60,7 @@ interface NewsDetailProps {
 }
 
 export function NewsDetail({ id }: NewsDetailProps) {
+  const queryClient = useQueryClient();
   const {
     data: article,
     isLoading,
@@ -64,6 +68,21 @@ export function NewsDetail({ id }: NewsDetailProps) {
   } = useQuery<NewsArticleDetail>({
     queryKey: ["article", id],
     queryFn: () => getNewsArticle(id),
+  });
+
+  const reanalyzeMutation = useMutation({
+    mutationFn: async () => reanalyzeSentiment([id]),
+    onSuccess: () => {
+      toast.success("Sentiment re-analysis started");
+      void queryClient.invalidateQueries({ queryKey: ["article", id] });
+      void queryClient.invalidateQueries({ queryKey: ["news"] });
+      void queryClient.invalidateQueries({ queryKey: ["trending-news"] });
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to start re-analysis"
+      );
+    },
   });
 
   if (isLoading) return <NewsDetailSkeleton />;
@@ -92,7 +111,6 @@ export function NewsDetail({ id }: NewsDetailProps) {
 
   if (!article) return null;
 
-  const primarySentiment = article.sentiment_analyses?.[0];
   const avgSentiment =
     article.sentiment_analyses?.length > 0
       ? article.sentiment_analyses.reduce(
@@ -135,6 +153,20 @@ export function NewsDetail({ id }: NewsDetailProps) {
             {avgSentiment !== null && (
               <SentimentBadge score={avgSentiment} size="lg" />
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={reanalyzeMutation.isPending}
+              onClick={() => reanalyzeMutation.mutate()}
+            >
+              {reanalyzeMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              Re-analyze article
+            </Button>
           </div>
         </CardHeader>
 

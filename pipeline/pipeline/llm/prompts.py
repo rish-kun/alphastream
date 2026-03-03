@@ -9,6 +9,12 @@ Article: {article_text}
 
 Context (if any): {context}
 
+Scoring rules:
+- sentiment_score must reflect expected stock-market impact, not writing tone.
+- Use negative values for downside risk, positive for upside impact, near 0 for mixed/unclear impact.
+- confidence must represent certainty in your own score.
+- If evidence is weak, keep confidence low and explain uncertainty.
+
 Respond ONLY with valid JSON in this exact format:
 {{
     "sentiment_score": <float between -1.0 and 1.0>,

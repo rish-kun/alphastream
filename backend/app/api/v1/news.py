@@ -21,6 +21,7 @@ async def get_news_feed(
     source: Annotated[str | None, Query()] = None,
     category: Annotated[str | None, Query()] = None,
     ticker: Annotated[str | None, Query()] = None,
+    search: Annotated[str | None, Query()] = None,
     from_date: Annotated[datetime | None, Query()] = None,
     to_date: Annotated[datetime | None, Query()] = None,
     db: Annotated[AsyncSession, Depends(get_db)] = None,
@@ -31,6 +32,7 @@ async def get_news_feed(
         source=source,
         category=category,
         ticker=ticker,
+        search=search,
         from_date=from_date,
         to_date=to_date,
     )
