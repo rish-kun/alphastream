@@ -2,7 +2,13 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { jwtVerify, SignJWT } from "jose";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+// Server-side: use BACKEND_URL (Docker internal hostname) when running in the container.
+// NEXT_PUBLIC_API_URL is baked at build time as localhost:8000 (for browsers) and
+// doesn't resolve from inside the frontend container.
+const API_URL =
+  process.env.BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8000/api/v1";
 const SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
 
 interface UserProfile {

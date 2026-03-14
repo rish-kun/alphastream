@@ -138,6 +138,14 @@ services:
     container_name: alphastream-frontend
     ports:
       - "3000:3000"          # host 3000 -> container 3000
+    environment:
+      # NextAuth v5: trust the container hostname; set canonical public URL
+      AUTH_TRUST_HOST: "true"
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-alphastream-secret-key-min-32-chars!!}
+      # Server-side backend URL: Next.js server code runs INSIDE the container,
+      # so it must use the Docker-internal service name, not localhost.
+      BACKEND_URL: http://alphastream-backend:8000/api/v1
     networks:
       - alphastream
     depends_on:
