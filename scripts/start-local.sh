@@ -11,6 +11,11 @@ echo ""
 echo "  Mode: app runs natively, DB + Redis in Docker"
 echo ""
 
+# Force environment variables for localhost docker infra
+export DATABASE_URL="postgresql+asyncpg://postgres:postgres@127.0.0.1:5433/alphastream"
+export REDIS_URL="redis://127.0.0.1:6380/0"
+
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'

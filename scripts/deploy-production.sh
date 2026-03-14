@@ -63,6 +63,10 @@ set -a
 source "$PROJECT_DIR/.env"
 set +a
 
+# Force environment variables for localhost docker infra
+export DATABASE_URL="postgresql+asyncpg://postgres:postgres@127.0.0.1:5433/alphastream"
+export REDIS_URL="redis://127.0.0.1:6380/0"
+
 # Verify critical variables
 REQUIRED_VARS=("SECRET_KEY" "GEMINI_API_KEYS" "DATABASE_URL" "REDIS_URL")
 for var in "${REQUIRED_VARS[@]}"; do

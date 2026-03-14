@@ -105,11 +105,13 @@ class NewsService:
 
     async def get_trending_news(self, limit: int = 10) -> list[NewsArticleResponse]:
         """Get trending news articles (most recent, with or without sentiment analyses)."""
+        from sqlalchemy.orm import selectinload
+        
         stmt = (
             select(NewsArticle)
-            .outerjoin(
-                SentimentAnalysis,
-                SentimentAnalysis.article_id == NewsArticle.id,
+            .options(
+                selectinload(NewsArticle.sentiment_analyses),
+                selectinload(NewsArticle.mentions).selectinload(ArticleStockMention.stock),
             )
             .order_by(NewsArticle.published_at.desc())
             .limit(limit)
@@ -121,7 +123,16 @@ class NewsService:
 
     async def get_article(self, article_id: uuid.UUID) -> NewsArticleResponse:
         """Get a specific news article by ID."""
-        stmt = select(NewsArticle).where(NewsArticle.id == article_id)
+        from sqlalchemy.orm import selectinload
+        
+        stmt = (
+            select(NewsArticle)
+            .options(
+                selectinload(NewsArticle.sentiment_analyses),
+                selectinload(NewsArticle.mentions).selectinload(ArticleStockMention.stock),
+            )
+            .where(NewsArticle.id == article_id)
+        )
         result = await self.db.execute(stmt)
         article = result.scalar_one_or_none()
 

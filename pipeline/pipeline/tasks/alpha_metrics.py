@@ -63,8 +63,8 @@ def _get_news_share(stock_id: str, db) -> float:
     return stock_mentions / total_articles
 
 
-def _get_price_change(ticker: str) -> float:
-    """Get price change percentage from yfinance."""
+def _get_price_change(ticker: str) -> tuple[float, float | None]:
+    """Get price change percentage and current price from yfinance."""
     try:
         import yfinance as yf
 
@@ -73,11 +73,12 @@ def _get_price_change(ticker: str) -> float:
         if len(hist) >= 2:
             current_price = hist["Close"].iloc[-1]
             previous_price = hist["Close"].iloc[0]
-            return (current_price - previous_price) / previous_price
-        return 0.0
+            price_change = (current_price - previous_price) / previous_price
+            return price_change, float(current_price)
+        return 0.0, None
     except Exception as e:
         logger.warning("Failed to fetch price data for %s: %s", ticker, str(e))
-        return 0.0
+        return 0.0, None
 
 
 @app.task(name="pipeline.tasks.alpha_metrics.compute_all")
@@ -188,11 +189,21 @@ def compute_stock_alpha(stock_id: str) -> dict:
         )
         narrative_velocity = _clamp(narrative_velocity)
 
-        price_change = _get_price_change(ticker)
+        price_change, current_price = _get_price_change(ticker)
         divergence = compute_divergence(current_sentiment, price_change)
         divergence = _clamp(divergence)
 
         composite = compute_composite(expectation_gap, narrative_velocity, divergence)
+
+        # Update stock price in database if we got a valid price
+        if current_price is not None:
+            db.execute(
+                text("""
+                    UPDATE stocks SET last_price = :price, price_updated_at = NOW()
+                    WHERE id = :stock_id
+                """),
+                {"price": current_price, "stock_id": stock_id},
+            )
 
         db.execute(
             text("""
@@ -336,7 +347,7 @@ def compute_sector_alpha(sector: str) -> dict:
 
         price_changes = []
         for stock in stocks_in_sector[:10]:
-            pc = _get_price_change(stock.ticker)
+            pc, _ = _get_price_change(stock.ticker)
             if pc != 0.0:
                 price_changes.append(pc)
 
