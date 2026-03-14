@@ -11,21 +11,12 @@ echo ""
 echo "  Mode: app runs natively, DB + Redis in Docker"
 echo ""
 
-# ── Environment configuration ─────────────────────────────────────
-# Colors (defined early for use in early echo statements)
+# Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 CYAN='\033[0;36m'
 NC='\033[0m'
-
-# Source .env file to load all configuration
-if [ -f "$PROJECT_DIR/.env" ]; then
-    echo -e "${CYAN}Loading environment from .env file...${NC}"
-    set -a
-    source "$PROJECT_DIR/.env"
-    set +a
-fi
 
 # ── Prerequisite checks ────────────────────────────────────────
 check_command() {
@@ -59,41 +50,12 @@ echo -e "${GREEN}Redis is ready.${NC}"
 # ── Initialize database schema/data ────────────────────────────
 echo -e "${CYAN}Running database migrations...${NC}"
 cd "$PROJECT_DIR/backend"
-
-# Ensure backend venv has pip
-if [ ! -f ".venv/bin/pip" ]; then
-    echo "Creating backend venv with pip..."
-    rm -rf .venv
-    uv venv --with pip
-fi
-
 uv run alembic upgrade head
 echo -e "${GREEN}Migrations complete.${NC}"
 
 echo -e "${CYAN}Seeding stock data...${NC}"
 uv run python scripts/seed_stocks.py
 echo -e "${GREEN}Seed complete.${NC}"
-
-# ── Install ML dependencies and download models ───────────────────
-echo -e "${CYAN}Installing ML dependencies for pipeline...${NC}"
-cd "$PROJECT_DIR/pipeline"
-
-# Ensure venv has pip (required for spacy and other tools)
-# Recreate venv with pip included if it doesn't have it
-if [ ! -f ".venv/bin/pip" ]; then
-    echo "Recreating venv with pip..."
-    rm -rf .venv
-    uv venv --with pip
-fi
-
-# Install ML extras using uv
-uv sync --extra ml
-echo -e "${GREEN}ML dependencies installed.${NC}"
-
-echo -e "${CYAN}Downloading spaCy model...${NC}"
-# Download spacy model using python directly
-.venv/bin/python -m spacy download en_core_web_sm
-echo -e "${GREEN}spaCy model downloaded.${NC}"
 
 # ── Start application processes ─────────────────────────────────
 echo ""
