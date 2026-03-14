@@ -18,7 +18,12 @@ class NewsService:
 
     async def get_news_feed(self, query: NewsFeedQuery) -> NewsListResponse:
         """Get paginated news feed with optional filters."""
-        base_stmt = select(NewsArticle)
+        from sqlalchemy.orm import selectinload
+        
+        base_stmt = select(NewsArticle).options(
+            selectinload(NewsArticle.sentiment_analyses),
+            selectinload(NewsArticle.mentions).selectinload(ArticleStockMention.stock),
+        )
         count_stmt = select(func.count(func.distinct(NewsArticle.id))).select_from(
             NewsArticle
         )

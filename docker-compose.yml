@@ -26,8 +26,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: alphastream
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5433:5432"          # host 5433 -> container 5432
+      - "127.0.0.1:5433:5432"          # host 5433 -> container 5432
     volumes:
       - alphastream_pgdata:/var/lib/postgresql/data
     networks:

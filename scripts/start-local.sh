@@ -11,17 +11,21 @@ echo ""
 echo "  Mode: app runs natively, DB + Redis in Docker"
 echo ""
 
-# Force environment variables for localhost docker infra
-export DATABASE_URL="postgresql+asyncpg://postgres:postgres@127.0.0.1:5433/alphastream"
-export REDIS_URL="redis://127.0.0.1:6380/0"
-
-
-# Colors
+# ── Environment configuration ─────────────────────────────────────
+# Colors (defined early for use in early echo statements)
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 CYAN='\033[0;36m'
 NC='\033[0m'
+
+# Source .env file to load all configuration
+if [ -f "$PROJECT_DIR/.env" ]; then
+    echo -e "${CYAN}Loading environment from .env file...${NC}"
+    set -a
+    source "$PROJECT_DIR/.env"
+    set +a
+fi
 
 # ── Prerequisite checks ────────────────────────────────────────
 check_command() {
@@ -61,6 +65,16 @@ echo -e "${GREEN}Migrations complete.${NC}"
 echo -e "${CYAN}Seeding stock data...${NC}"
 uv run python scripts/seed_stocks.py
 echo -e "${GREEN}Seed complete.${NC}"
+
+# ── Install ML dependencies and download models ───────────────────
+echo -e "${CYAN}Installing ML dependencies for pipeline...${NC}"
+cd "$PROJECT_DIR/pipeline"
+uv sync --extra ml
+echo -e "${GREEN}ML dependencies installed.${NC}"
+
+echo -e "${CYAN}Downloading spaCy model...${NC}"
+uv run python -m spacy download en_core_web_sm
+echo -e "${GREEN}spaCy model downloaded.${NC}"
 
 # ── Start application processes ─────────────────────────────────
 echo ""
