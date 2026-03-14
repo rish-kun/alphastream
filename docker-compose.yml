@@ -124,6 +124,32 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # ── Startup Seeder (one-shot) ────────────────────────────────
+  # Runs once on startup to seed the app with RSS news and kick off
+  # sentiment analysis so the app has data on first launch.
+  alphastream-startup-seeder:
+    build:
+      context: ./pipeline
+      dockerfile: Dockerfile
+    container_name: alphastream-startup-seeder
+    command: ["uv", "run", "python", "scripts/startup_seed.py"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@alphastream-postgres:5432/alphastream
+      REDIS_URL: redis://alphastream-redis:6379/0
+      PYTHONPATH: /app
+    networks:
+      - alphastream
+    depends_on:
+      alphastream-postgres:
+        condition: service_healthy
+      alphastream-redis:
+        condition: service_healthy
+      alphastream-worker:
+        condition: service_started
+    restart: "no"          # exit cleanly after seeding
+
   # ── Frontend (Next.js) ──────────────────────────────────────
   alphastream-frontend:
     build:
