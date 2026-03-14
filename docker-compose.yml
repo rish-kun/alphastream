@@ -67,7 +67,6 @@ services:
       # Docker-internal overrides (take precedence over .env)
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@alphastream-postgres:5432/alphastream
       REDIS_URL: redis://alphastream-redis:6379/0
-      CORS_ORIGINS: '["http://localhost:3000"]'
     networks:
       - alphastream
     depends_on:

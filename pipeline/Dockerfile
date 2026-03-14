@@ -18,7 +18,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 # Download spaCy model
-RUN uv run python -m spacy download en_core_web_sm
+RUN uv pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 
 # Copy application code
 COPY pipeline/ ./pipeline/

@@ -23,7 +23,7 @@ ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
 RUN bun run build
 
 # ---- Production stage ----
-FROM oven/bun:1-slim AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
@@ -36,4 +36,4 @@ COPY --from=builder /app/public ./public
 
 EXPOSE 3000
 
-CMD ["bun", "run", "server.js"]
+CMD ["node", "server.js"]
