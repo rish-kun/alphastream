@@ -69,11 +69,14 @@ echo -e "${GREEN}Seed complete.${NC}"
 # ── Install ML dependencies and download models ───────────────────
 echo -e "${CYAN}Installing ML dependencies for pipeline...${NC}"
 cd "$PROJECT_DIR/pipeline"
+
+# Install ML extras using uv
 uv sync --extra ml
 echo -e "${GREEN}ML dependencies installed.${NC}"
 
 echo -e "${CYAN}Downloading spaCy model...${NC}"
-uv run python -m spacy download en_core_web_sm
+# Download spacy model using uvx (runs spacy without needing pip in venv)
+uvx --with spacy spacy download en_core_web_sm
 echo -e "${GREEN}spaCy model downloaded.${NC}"
 
 # ── Start application processes ─────────────────────────────────
