@@ -59,6 +59,14 @@ echo -e "${GREEN}Redis is ready.${NC}"
 # ── Initialize database schema/data ────────────────────────────
 echo -e "${CYAN}Running database migrations...${NC}"
 cd "$PROJECT_DIR/backend"
+
+# Ensure backend venv has pip
+if [ ! -f ".venv/bin/pip" ]; then
+    echo "Creating backend venv with pip..."
+    rm -rf .venv
+    uv venv --with pip
+fi
+
 uv run alembic upgrade head
 echo -e "${GREEN}Migrations complete.${NC}"
 
@@ -70,13 +78,21 @@ echo -e "${GREEN}Seed complete.${NC}"
 echo -e "${CYAN}Installing ML dependencies for pipeline...${NC}"
 cd "$PROJECT_DIR/pipeline"
 
+# Ensure venv has pip (required for spacy and other tools)
+# Recreate venv with pip included if it doesn't have it
+if [ ! -f ".venv/bin/pip" ]; then
+    echo "Recreating venv with pip..."
+    rm -rf .venv
+    uv venv --with pip
+fi
+
 # Install ML extras using uv
 uv sync --extra ml
 echo -e "${GREEN}ML dependencies installed.${NC}"
 
 echo -e "${CYAN}Downloading spaCy model...${NC}"
-# Download spacy model using uvx (runs spacy without needing pip in venv)
-uvx --with spacy spacy download en_core_web_sm
+# Download spacy model using python directly
+.venv/bin/python -m spacy download en_core_web_sm
 echo -e "${GREEN}spaCy model downloaded.${NC}"
 
 # ── Start application processes ─────────────────────────────────
