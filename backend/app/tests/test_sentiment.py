@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.tests.conftest import MockResult
@@ -14,17 +12,17 @@ from app.tests.conftest import MockResult
 
 class TestSentimentOverview:
     async def test_returns_overview(self, client: AsyncClient, mock_db: AsyncMock):
+        class StatsRow:
+            avg_sentiment = 0.35
+            bullish = 10
+            bearish = 5
+            neutral = 15
+
         # Mock the sequence of DB calls in the sentiment overview endpoint:
-        # 1. avg sentiment -> 0.35
-        # 2. bullish count -> 10
-        # 3. bearish count -> 5
-        # 4. neutral count -> 15
-        # 5. top movers -> empty list
+        # 1. stats query
+        # 2. top movers -> empty list
         mock_db.execute.side_effect = [
-            MockResult(scalar=0.35),  # avg sentiment
-            MockResult(scalar=10),  # bullish
-            MockResult(scalar=5),  # bearish
-            MockResult(scalar=15),  # neutral
+            MockResult(one_row=StatsRow()),  # stats query
             MockResult(data=[]),  # top movers
         ]
 
@@ -41,12 +39,15 @@ class TestSentimentOverview:
     async def test_overview_with_null_sentiment(
         self, client: AsyncClient, mock_db: AsyncMock
     ):
+        class StatsRowNull:
+            avg_sentiment = None
+            bullish = 0
+            bearish = 0
+            neutral = 0
+
         # When no analyses exist, avg returns None -> should default to 0.0
         mock_db.execute.side_effect = [
-            MockResult(scalar=None),  # avg sentiment (no data)
-            MockResult(scalar=0),  # bullish
-            MockResult(scalar=0),  # bearish
-            MockResult(scalar=0),  # neutral
+            MockResult(one_row=StatsRowNull()),  # stats query
             MockResult(data=[]),  # top movers
         ]
 
@@ -99,8 +100,10 @@ class TestSentimentReanalysis:
         article_id = uuid.uuid4()
         mock_db.execute.return_value = MockResult(data=[article_id])
 
-        with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task:
+        with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task, \
+             patch("app.api.v1.sentiment.reanalysis_status_service.start_reanalysis") as mock_start_reanalysis:
             mock_send_task.return_value = MagicMock(id="task-123")
+            mock_start_reanalysis.return_value = None
 
             resp = await client.post(
                 "/api/v1/sentiment/reanalyze",
