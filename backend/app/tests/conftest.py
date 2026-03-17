@@ -156,9 +156,10 @@ async def unauthed_client(mock_db: AsyncMock) -> AsyncGenerator[AsyncClient, Non
 class MockResult:
     """A simple mock for SQLAlchemy execute() results."""
 
-    def __init__(self, data=None, scalar=None):
+    def __init__(self, data=None, scalar=None, one_row=None):
         self._data = data or []
         self._scalar = scalar
+        self._one_row = one_row
 
     def scalars(self):
         return self
@@ -176,6 +177,9 @@ class MockResult:
         if self._scalar is None:
             return 0
         return self._scalar
+
+    def one(self):
+        return self._one_row
 
 
 @pytest.fixture
