@@ -248,12 +248,10 @@ async def get_sector_sentiment(
         top_stocks = [r[0] for r in top_stocks_result.all()]
 
         # Deduplicate tickers while preserving order
-        seen = set()
-        unique_stocks = []
-        for t in top_stocks:
-            if t not in seen:
-                seen.add(t)
-                unique_stocks.append(t)
+        # ⚡ Bolt Optimization: Replace loop-and-set O(n) deduplication with C-optimized
+        # list(dict.fromkeys(sequence)). This idiomatic Python 3.7+ approach is faster
+        # because it avoids the Python interpreter loop overhead for member checks and appends.
+        unique_stocks = list(dict.fromkeys(top_stocks))
 
         results.append(
             SectorSentiment(
