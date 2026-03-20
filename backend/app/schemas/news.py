@@ -64,6 +64,4 @@ class NewsFeedQuery(BaseModel):
     to_date: datetime | None = None
 
 
-from app.schemas.sentiment import SentimentResponse
-
 NewsArticleResponse.model_rebuild()
