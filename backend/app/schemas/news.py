@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    from app.schemas.sentiment import SentimentResponse
+from app.schemas.sentiment import SentimentResponse
 
 
 class NewsMention(BaseModel):
