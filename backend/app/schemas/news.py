@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    from app.schemas.sentiment import SentimentResponse
+from app.schemas.sentiment import SentimentResponse
 
 
 class NewsMention(BaseModel):
@@ -63,7 +62,5 @@ class NewsFeedQuery(BaseModel):
     from_date: datetime | None = None
     to_date: datetime | None = None
 
-
-from app.schemas.sentiment import SentimentResponse
 
 NewsArticleResponse.model_rebuild()

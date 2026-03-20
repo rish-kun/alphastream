@@ -5,9 +5,13 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
+import typing
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if typing.TYPE_CHECKING:
+    from app.models.stock import Stock
 
 
 class Portfolio(Base):
