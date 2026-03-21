@@ -1,0 +1,3 @@
+## 2026-03-03 - [Fixing N+1 queries in grouped stock endpoints]
+**Learning:** Using PostgreSQL `DISTINCT ON` in conjunction with a window function `func.row_number()` allows us to deduplicate stocks and rank them across multiple sectors simultaneously. This avoids creating N+1 queries when fetching top items for multiple groups (like top stocks for N sectors), taking advantage of PostgreSQL features supported safely in the backend.
+**Action:** When asked to fetch top N items per group where data is relational, use CTEs/subqueries with `DISTINCT ON` to deduplicate before ranking, bypassing the need for nested loop queries or inefficient `.group_by()`.
