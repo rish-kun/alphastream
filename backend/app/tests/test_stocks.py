@@ -70,9 +70,13 @@ class TestSearchStocks:
         assert len(data["results"]) == 1
         assert data["results"][0]["ticker"] == "RELIANCE"
 
-    async def test_search_requires_query(self, client: AsyncClient):
+    async def test_search_requires_query(self, client: AsyncClient, mock_db: AsyncMock):
+        # We need mock_db here because when q is None, the endpoint doesn't return 422 anymore;
+        # it attempts to search database directly using StockService.
+        mock_db.execute.return_value = MockResult(data=[])
         resp = await client.get("/api/v1/stocks/search")
-        assert resp.status_code == 422
+        # No query is allowed now, so it returns 200
+        assert resp.status_code == 200
 
     async def test_search_limit_validation(self, client: AsyncClient):
         resp = await client.get("/api/v1/stocks/search?q=test&limit=0")

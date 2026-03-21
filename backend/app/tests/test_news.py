@@ -107,8 +107,8 @@ class TestGetNewsFeed:
         resp = await client.get("/api/v1/news/?page=0")
         assert resp.status_code == 422
 
-    async def test_invalid_page_size(self, client: AsyncClient):
-        resp = await client.get("/api/v1/news/?page_size=100")
+    async def test_invalid_page_size(self, client: AsyncClient, mock_db: AsyncMock):
+        resp = await client.get("/api/v1/news/?page_size=2000")
         assert resp.status_code == 422
 
 
