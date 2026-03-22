@@ -1,7 +1,6 @@
 import multiprocessing
 import os
 from celery import Celery
-from celery.schedules import crontab
 
 if multiprocessing.get_start_method(allow_none=True) is None:
     multiprocessing.set_start_method("spawn", force=True)

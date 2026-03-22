@@ -12,7 +12,6 @@ import logging
 import sys
 import uuid
 from datetime import datetime, UTC
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -418,7 +417,6 @@ class TestResearchTopicTask:
             raise
 
 
-import pytest
 
 class TestDatabaseConnection:
     """Tests for database connection status."""
