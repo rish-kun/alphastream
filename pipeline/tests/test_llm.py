@@ -1,7 +1,6 @@
 """Tests for LLM modules — Gemini, OpenRouter, RateLimiter, Prompts."""
 
 import json
-import time
 from unittest.mock import MagicMock, patch
 
 import pytest

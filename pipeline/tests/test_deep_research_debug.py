@@ -12,7 +12,6 @@ import logging
 import sys
 import uuid
 from datetime import datetime, UTC
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -418,9 +417,11 @@ class TestResearchTopicTask:
             raise
 
 
+
 class TestDatabaseConnection:
     """Tests for database connection status."""
 
+    @pytest.mark.skip(reason="Needs live DB")
     def test_database_connection(self):
         """Test database connection and schema."""
         logger.info("=" * 80)

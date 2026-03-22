@@ -5,9 +5,14 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID
+from typing import TYPE_CHECKING
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.sentiment import SentimentAnalysis
+    from app.models.stock import Stock
 
 
 class NewsArticle(Base):

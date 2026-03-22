@@ -230,37 +230,60 @@ async def get_sector_sentiment(
     sector_result = await db.execute(sector_stmt)
     sector_rows = sector_result.all()
 
+    if not sector_rows:
+        return []
+
+    sectors = [row[0] for row in sector_rows]
+
+    # ⚡ Bolt: Eliminate N+1 query by batching top stocks retrieval.
+    # Uses DISTINCT ON to deduplicate by ticker and row_number() to rank top 5 per sector efficiently.
+    distinct_stocks = (
+        select(Stock.sector, Stock.ticker, AlphaMetric.composite_score)
+        .join(AlphaMetric, AlphaMetric.stock_id == Stock.id)
+        .where(Stock.sector.in_(sectors))
+        .distinct(Stock.sector, Stock.ticker)
+        .order_by(Stock.sector, Stock.ticker, AlphaMetric.composite_score.desc())
+        .subquery()
+    )
+
+    ranked_stocks = (
+        select(
+            distinct_stocks.c.sector,
+            distinct_stocks.c.ticker,
+            func.row_number()
+            .over(
+                partition_by=distinct_stocks.c.sector,
+                order_by=distinct_stocks.c.composite_score.desc(),
+            )
+            .label("rn"),
+        ).subquery()
+    )
+
+    top_stocks_stmt = (
+        select(ranked_stocks.c.sector, ranked_stocks.c.ticker)
+        .where(ranked_stocks.c.rn <= 5)
+        .order_by(ranked_stocks.c.sector, ranked_stocks.c.rn)
+    )
+
+    top_stocks_result = await db.execute(top_stocks_stmt)
+    top_stocks_rows = top_stocks_result.all()
+
+    top_stocks_by_sector: dict[str, list[str]] = {s: [] for s in sectors}
+    for row in top_stocks_rows:
+        top_stocks_by_sector[row[0]].append(row[1])
+
     results = []
     for row in sector_rows:
         sector = row[0]
         avg_sentiment = float(row[1]) if row[1] is not None else 0.0
         article_count = row[2]
 
-        # Get top stocks for this sector (by alpha composite_score)
-        top_stocks_stmt = (
-            select(Stock.ticker)
-            .join(AlphaMetric, AlphaMetric.stock_id == Stock.id)
-            .where(Stock.sector == sector)
-            .order_by(AlphaMetric.composite_score.desc())
-            .limit(5)
-        )
-        top_stocks_result = await db.execute(top_stocks_stmt)
-        top_stocks = [r[0] for r in top_stocks_result.all()]
-
-        # Deduplicate tickers while preserving order
-        seen = set()
-        unique_stocks = []
-        for t in top_stocks:
-            if t not in seen:
-                seen.add(t)
-                unique_stocks.append(t)
-
         results.append(
             SectorSentiment(
                 sector=sector,
                 sentiment_score=avg_sentiment,
                 article_count=article_count,
-                top_stocks=unique_stocks,
+                top_stocks=top_stocks_by_sector.get(sector, []),
             )
         )
 
