@@ -4,11 +4,9 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import verify_token
 from app.database import get_db

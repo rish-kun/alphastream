@@ -156,9 +156,10 @@ async def unauthed_client(mock_db: AsyncMock) -> AsyncGenerator[AsyncClient, Non
 class MockResult:
     """A simple mock for SQLAlchemy execute() results."""
 
-    def __init__(self, data=None, scalar=None):
+    def __init__(self, data=None, scalar=None, scalar_one=None):
         self._data = data or []
         self._scalar = scalar
+        self._scalar_one = scalar_one
 
     def scalars(self):
         return self
@@ -173,6 +174,8 @@ class MockResult:
         return self._scalar
 
     def scalar_one(self):
+        if self._scalar_one is not None:
+            return self._scalar_one
         if self._scalar is None:
             return 0
         return self._scalar

@@ -104,12 +104,13 @@ def scrape_subreddit(self: Task, subreddit_name: str, limit: int = 25) -> dict:
                         post.get("created_utc", 0), tz=timezone.utc
                     )
 
-                    db.execute(
+                    article_result = db.execute(
                         text("""
                             INSERT INTO news_articles 
                             (title, summary, full_text, url, source, published_at, content_hash, category)
                             VALUES (:title, :summary, :full_text, :url, 'reddit', :published_at, :content_hash, 'reddit')
-                            ON CONFLICT (url) DO NOTHING
+                            ON CONFLICT (url) DO UPDATE SET url = EXCLUDED.url
+                            RETURNING id
                         """),
                         {
                             "title": post.get("title", ""),
@@ -119,11 +120,6 @@ def scrape_subreddit(self: Task, subreddit_name: str, limit: int = 25) -> dict:
                             "published_at": published_at,
                             "content_hash": content_hash,
                         },
-                    )
-
-                    article_result = db.execute(
-                        text("SELECT id FROM news_articles WHERE url = :url"),
-                        {"url": post_url},
                     ).fetchone()
 
                     if article_result:
