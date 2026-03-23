@@ -3,9 +3,15 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Numeric, String, func, text
+from sqlalchemy import BigInteger, DateTime, Numeric, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from typing import TYPE_CHECKING
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+if TYPE_CHECKING:
+    from app.models.news import ArticleStockMention
+    from app.models.portfolio import PortfolioStock
+    from app.models.sentiment import AlphaMetric
 
 from app.database import Base
 
