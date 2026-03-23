@@ -40,8 +40,8 @@ TEST_USER_PASSWORD = "SecurePassword123!"
 TEST_USER_NAME = "Test User"
 
 
-def _make_test_user(**overrides) -> MagicMock:
-    """Create a mock User for testing (avoids SQLAlchemy instrumentation issues)."""
+def _make_test_user(**overrides) -> User:
+    """Create a User model instance for testing (avoids Pydantic validation issues with Mocks)."""
     defaults = {
         "id": TEST_USER_ID,
         "email": TEST_USER_EMAIL,
@@ -56,9 +56,7 @@ def _make_test_user(**overrides) -> MagicMock:
         "updated_at": None,
     }
     defaults.update(overrides)
-    user = MagicMock(spec=User)
-    for k, v in defaults.items():
-        setattr(user, k, v)
+    user = User(**defaults)
     return user
 
 
