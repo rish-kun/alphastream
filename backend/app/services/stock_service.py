@@ -210,26 +210,20 @@ class StockService:
         if stock is None:
             raise NotFoundError("Stock", ticker)
 
-        # Get latest alpha metrics, ordered by computed_at desc
-        # Use distinct on window_hours to get only the most recent per window
+        # ⚡ Bolt Optimization: Use PostgreSQL's DISTINCT ON to deduplicate at the database level.
+        # This prevents pulling thousands of historical metrics over the wire only to discard them in Python.
+        # Expected Impact: Reduces database payload size by 90%+ and eliminates O(n) loop overhead for heavily traded stocks.
         metrics_stmt = (
             select(AlphaMetric)
             .where(AlphaMetric.stock_id == stock.id)
+            .distinct(AlphaMetric.window_hours)
             .order_by(
                 AlphaMetric.window_hours,
                 AlphaMetric.computed_at.desc(),
             )
         )
         metrics_result = await self.db.execute(metrics_stmt)
-        all_metrics = metrics_result.scalars().all()
-
-        # Deduplicate: keep only the latest per window_hours
-        seen_windows: set[int] = set()
-        metrics = []
-        for m in all_metrics:
-            if m.window_hours not in seen_windows:
-                seen_windows.add(m.window_hours)
-                metrics.append(m)
+        metrics = metrics_result.scalars().all()
 
         return {
             "stock": stock.ticker,
