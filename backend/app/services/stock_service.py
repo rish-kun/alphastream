@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import NotFoundError
 from app.models.news import ArticleStockMention, NewsArticle
-from app.models.sentiment import AlphaMetric, SentimentAnalysis
+from app.models.sentiment import AlphaMetric
 from app.models.stock import Stock
 from app.schemas.stock import (
     StockDetail,
