@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
-import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import AsyncClient
 
-from app.core.security import create_access_token, create_refresh_token, hash_password
+from app.core.security import create_refresh_token, hash_password
 from app.models.user import User
 from app.tests.conftest import TEST_USER_EMAIL, TEST_USER_ID, TEST_USER_NAME, MockResult
 
 
-def _make_user(**overrides) -> MagicMock:
-    """Create a mock User for testing."""
+def _make_user(**overrides) -> User:
+    """Create a User model instance for testing."""
     defaults = {
         "id": TEST_USER_ID,
         "email": TEST_USER_EMAIL,
@@ -30,9 +28,7 @@ def _make_user(**overrides) -> MagicMock:
         "updated_at": None,
     }
     defaults.update(overrides)
-    user = MagicMock(spec=User)
-    for k, v in defaults.items():
-        setattr(user, k, v)
+    user = User(**defaults)
     return user
 
 
@@ -53,6 +49,7 @@ class TestRegister:
             instance.create_user = AsyncMock(return_value=new_user)
             instance.create_tokens = AsyncMock(
                 return_value=MagicMock(
+                    user=new_user,
                     access_token="access-token",
                     refresh_token="refresh-token",
                     token_type="bearer",
@@ -111,6 +108,7 @@ class TestLogin:
             instance.authenticate_user = AsyncMock(return_value=user)
             instance.create_tokens = AsyncMock(
                 return_value=MagicMock(
+                    user=user,
                     access_token="access-token",
                     refresh_token="refresh-token",
                     token_type="bearer",
@@ -144,6 +142,7 @@ class TestRefresh:
             instance = MockService.return_value
             instance.refresh_token = AsyncMock(
                 return_value=MagicMock(
+                    user=_make_user(),
                     access_token="new-access-token",
                     refresh_token="new-refresh-token",
                     token_type="bearer",
@@ -175,4 +174,4 @@ class TestGetMe:
 
     async def test_get_me_unauthenticated(self, unauthed_client: AsyncClient):
         resp = await unauthed_client.get("/api/v1/auth/me")
-        assert resp.status_code == 422  # Missing Authorization header
+        assert resp.status_code == 401  # Missing Authorization header

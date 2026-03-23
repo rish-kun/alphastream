@@ -1,4 +1,3 @@
-import pytest
 from app.config import Settings
 
 # --- Tests for GEMINI_API_KEYS and OPENROUTER_API_KEYS ---
