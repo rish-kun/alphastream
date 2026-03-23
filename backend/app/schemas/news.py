@@ -64,6 +64,8 @@ class NewsFeedQuery(BaseModel):
     to_date: datetime | None = None
 
 
-from app.schemas.sentiment import SentimentResponse
+# We import this down here to avoid circular imports.
+# In a larger refactor, we would reconsider the schema import graph.
+from app.schemas.sentiment import SentimentResponse  # noqa: E402
 
 NewsArticleResponse.model_rebuild()
