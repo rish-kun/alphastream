@@ -64,6 +64,9 @@ class NewsFeedQuery(BaseModel):
     to_date: datetime | None = None
 
 
-from app.schemas.sentiment import SentimentResponse
+# Defer import and rebuild to avoid circular dependencies where needed
+def _rebuild_news_article_response() -> None:
+    from app.schemas.sentiment import SentimentResponse  # noqa: F401
+    NewsArticleResponse.model_rebuild()
 
-NewsArticleResponse.model_rebuild()
+_rebuild_news_article_response()
