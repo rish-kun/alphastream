@@ -1,0 +1,3 @@
+## 2026-03-03 - [PostgreSQL DISTINCT ON Deduplication]
+**Learning:** [In a PostgreSQL-backed FastAPI application, doing deduplication logic in Python (fetching all historical records to filter by max date/time) leads to massive network I/O and memory overhead. Using SQLAlchemy's `.distinct(*columns)` correctly translates to PostgreSQL's `DISTINCT ON` feature, allowing efficient deduplication and ordering directly in the database, reducing both memory footprint and instantiation overhead from O(N) to O(1) per group.]
+**Action:** [Always leverage PostgreSQL's `DISTINCT ON` via SQLAlchemy `.distinct(columns)` combined with `.order_by` to filter the "latest" record per group instead of pulling the entire dataset into application memory.]
