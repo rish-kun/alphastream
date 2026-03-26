@@ -227,8 +227,65 @@ async def get_sector_sentiment(
         .group_by(Stock.sector)
         .order_by(Stock.sector)
     )
+    # To resolve the N+1 query problem, fetch top stocks for all sectors in a single query
+    # using a window function to rank stocks within each sector.
+
+    unique_tickers_subq = (
+        select(Stock.sector, Stock.ticker, func.max(AlphaMetric.composite_score).label("max_score"))
+        .join(AlphaMetric, AlphaMetric.stock_id == Stock.id)
+        .where(Stock.sector.isnot(None))
+        .group_by(Stock.sector, Stock.ticker)
+        .subquery()
+    )
+
+    top_stocks_stmt = (
+        select(
+            unique_tickers_subq.c.sector,
+            unique_tickers_subq.c.ticker
+        )
+        .add_columns(
+            func.row_number()
+            .over(
+                partition_by=unique_tickers_subq.c.sector,
+                order_by=unique_tickers_subq.c.max_score.desc()
+            ).label("rn")
+        )
+        .subquery()
+    )
+
+    final_top_stocks_stmt = (
+        select(top_stocks_stmt.c.sector, top_stocks_stmt.c.ticker)
+        .where(top_stocks_stmt.c.rn <= 5)
+        .order_by(top_stocks_stmt.c.sector, top_stocks_stmt.c.rn)
+    )
+
+    # Execute both queries concurrently if possible, or sequentially
     sector_result = await db.execute(sector_stmt)
     sector_rows = sector_result.all()
+
+    # We only need top stocks if there are sectors
+    sector_names = [row[0] for row in sector_rows if row[0] is not None]
+
+    top_stocks_dict = {}
+    if sector_names:
+        top_stocks_result = await db.execute(final_top_stocks_stmt)
+        for row in top_stocks_result.all():
+            # SQLAlchemy tuples might return (sector, ticker) differently depending on exact mock structure
+            # To handle both real SQLAlchemy Rows and simple test mocks securely:
+            try:
+                sec = row.sector
+            except AttributeError:
+                sec = row[0]
+
+            try:
+                ticker = row.ticker
+            except AttributeError:
+                ticker = row[1]
+
+            if sec not in top_stocks_dict:
+                top_stocks_dict[sec] = []
+            if len(top_stocks_dict[sec]) < 5:
+                top_stocks_dict[sec].append(ticker)
 
     results = []
     for row in sector_rows:
@@ -236,31 +293,14 @@ async def get_sector_sentiment(
         avg_sentiment = float(row[1]) if row[1] is not None else 0.0
         article_count = row[2]
 
-        # Get top stocks for this sector (by alpha composite_score)
-        top_stocks_stmt = (
-            select(Stock.ticker)
-            .join(AlphaMetric, AlphaMetric.stock_id == Stock.id)
-            .where(Stock.sector == sector)
-            .order_by(AlphaMetric.composite_score.desc())
-            .limit(5)
-        )
-        top_stocks_result = await db.execute(top_stocks_stmt)
-        top_stocks = [r[0] for r in top_stocks_result.all()]
-
-        # Deduplicate tickers while preserving order
-        seen = set()
-        unique_stocks = []
-        for t in top_stocks:
-            if t not in seen:
-                seen.add(t)
-                unique_stocks.append(t)
+        top_stocks = top_stocks_dict.get(sector, [])
 
         results.append(
             SectorSentiment(
                 sector=sector,
                 sentiment_score=avg_sentiment,
                 article_count=article_count,
-                top_stocks=unique_stocks,
+                top_stocks=top_stocks,
             )
         )
 
