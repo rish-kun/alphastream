@@ -270,7 +270,18 @@ async def get_sector_sentiment(
     if sector_names:
         top_stocks_result = await db.execute(final_top_stocks_stmt)
         for row in top_stocks_result.all():
-            sec, ticker = row[0], row[1]
+            # SQLAlchemy tuples might return (sector, ticker) differently depending on exact mock structure
+            # To handle both real SQLAlchemy Rows and simple test mocks securely:
+            try:
+                sec = row.sector
+            except AttributeError:
+                sec = row[0]
+
+            try:
+                ticker = row.ticker
+            except AttributeError:
+                ticker = row[1]
+
             if sec not in top_stocks_dict:
                 top_stocks_dict[sec] = []
             if len(top_stocks_dict[sec]) < 5:
