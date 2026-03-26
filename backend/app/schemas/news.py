@@ -43,7 +43,7 @@ class NewsArticleResponse(BaseModel):
     published_at: datetime
     category: str | None = None
     mentions: list[NewsMention] = []
-    sentiment_analyses: list[SentimentResponse] = []
+    sentiment_analyses: list['SentimentResponse'] = []
 
 
 class NewsListResponse(BaseModel):
@@ -64,6 +64,8 @@ class NewsFeedQuery(BaseModel):
     to_date: datetime | None = None
 
 
-from app.schemas.sentiment import SentimentResponse
+def rebuild_models():
+    from app.schemas.sentiment import SentimentResponse
+    NewsArticleResponse.model_rebuild(_types_namespace={'SentimentResponse': SentimentResponse})
 
-NewsArticleResponse.model_rebuild()
+rebuild_models()
