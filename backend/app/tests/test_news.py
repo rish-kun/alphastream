@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 from httpx import AsyncClient
+from app.tests.conftest import MockResult
 
 from app.core.exceptions import NotFoundError
 from app.schemas.news import NewsArticleResponse, NewsListResponse
