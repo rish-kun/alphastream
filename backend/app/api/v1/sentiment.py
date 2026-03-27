@@ -65,6 +65,7 @@ class SentimentTaskStatusResponse(BaseModel):
     result: dict | None = None
     error: str | None = None
 
+
 class ArticleReanalysisStatusResponse(BaseModel):
     article_id: str
     status: str
@@ -75,7 +76,6 @@ class ArticleReanalysisStatusResponse(BaseModel):
     progress: dict | None = None
     result: dict | None = None
     error: str | None = None
-
 
 
 @router.get("/overview", response_model=SentimentOverview)
@@ -230,37 +230,56 @@ async def get_sector_sentiment(
     sector_result = await db.execute(sector_stmt)
     sector_rows = sector_result.all()
 
+    if not sector_rows:
+        return []
+
+    # Fetch top 5 stocks for all sectors in a single query to avoid N+1 problem
+    # We use a window function to rank stocks within each sector by composite score
+    ranked_stocks_subq = (
+        select(
+            Stock.sector,
+            Stock.ticker,
+            func.row_number()
+            .over(
+                partition_by=Stock.sector, order_by=AlphaMetric.composite_score.desc()
+            )
+            .label("rn"),
+        )
+        .join(AlphaMetric, AlphaMetric.stock_id == Stock.id)
+        .where(Stock.sector.in_([row[0] for row in sector_rows]))
+        .subquery()
+    )
+
+    top_stocks_stmt = (
+        select(ranked_stocks_subq.c.sector, ranked_stocks_subq.c.ticker)
+        .where(ranked_stocks_subq.c.rn <= 5)
+        .order_by(ranked_stocks_subq.c.sector, ranked_stocks_subq.c.rn)
+    )
+
+    top_stocks_result = await db.execute(top_stocks_stmt)
+
+    # Group top stocks by sector
+    top_stocks_by_sector = {}
+    for sector, ticker in top_stocks_result.all():
+        if sector not in top_stocks_by_sector:
+            top_stocks_by_sector[sector] = []
+
+        # Deduplicate tickers while preserving order
+        if ticker not in top_stocks_by_sector[sector]:
+            top_stocks_by_sector[sector].append(ticker)
+
     results = []
     for row in sector_rows:
         sector = row[0]
         avg_sentiment = float(row[1]) if row[1] is not None else 0.0
         article_count = row[2]
 
-        # Get top stocks for this sector (by alpha composite_score)
-        top_stocks_stmt = (
-            select(Stock.ticker)
-            .join(AlphaMetric, AlphaMetric.stock_id == Stock.id)
-            .where(Stock.sector == sector)
-            .order_by(AlphaMetric.composite_score.desc())
-            .limit(5)
-        )
-        top_stocks_result = await db.execute(top_stocks_stmt)
-        top_stocks = [r[0] for r in top_stocks_result.all()]
-
-        # Deduplicate tickers while preserving order
-        seen = set()
-        unique_stocks = []
-        for t in top_stocks:
-            if t not in seen:
-                seen.add(t)
-                unique_stocks.append(t)
-
         results.append(
             SectorSentiment(
                 sector=sector,
                 sentiment_score=avg_sentiment,
                 article_count=article_count,
-                top_stocks=unique_stocks,
+                top_stocks=top_stocks_by_sector.get(sector, []),
             )
         )
 
@@ -276,8 +295,7 @@ async def reanalyze_articles_sentiment(
     existing_rows = await db.execute(
         select(NewsArticle.id).where(NewsArticle.id.in_(body.article_ids))
     )
-    existing_ids = {str(article_id)
-                    for article_id in existing_rows.scalars().all()}
+    existing_ids = {str(article_id) for article_id in existing_rows.scalars().all()}
 
     task_ids: list[str] = []
     skipped: list[uuid.UUID] = []
@@ -294,7 +312,7 @@ async def reanalyze_articles_sentiment(
             kwargs={"force_reanalyze": body.force_reanalyze},
         )
         task_ids.append(task.id)
-        
+
         # Track reanalysis status in Redis
         await reanalysis_status_service.start_reanalysis(
             article_id=article_id_str,
@@ -375,6 +393,7 @@ async def get_reanalyze_all_status(
         progress=result.info if isinstance(result.info, dict) else None,
     )
 
+
 @router.get(
     "/reanalyze/article/{article_id}/status",
     response_model=ArticleReanalysisStatusResponse,
@@ -385,13 +404,13 @@ async def get_article_reanalysis_status(
 ) -> ArticleReanalysisStatusResponse:
     """Get the reanalysis status for a specific article."""
     status_data = await reanalysis_status_service.get_status(article_id)
-    
+
     if not status_data:
         return ArticleReanalysisStatusResponse(
             article_id=article_id,
             status="not_found",
         )
-    
+
     return ArticleReanalysisStatusResponse(
         article_id=status_data.get("article_id", article_id),
         status=status_data.get("status", "unknown"),

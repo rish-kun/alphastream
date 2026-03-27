@@ -53,9 +53,11 @@ class NewsListResponse(BaseModel):
     page_size: int
 
 
+from pydantic import Field
+
 class NewsFeedQuery(BaseModel):
-    page: int = 1
-    page_size: int = 20
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=50)
     source: str | None = None
     category: str | None = None
     ticker: str | None = None
@@ -64,6 +66,10 @@ class NewsFeedQuery(BaseModel):
     to_date: datetime | None = None
 
 
-from app.schemas.sentiment import SentimentResponse
+def rebuild_schemas():
+    from app.schemas.sentiment import SentimentResponse
+    NewsArticleResponse.model_rebuild(
+        _types_namespace={"SentimentResponse": SentimentResponse}
+    )
 
-NewsArticleResponse.model_rebuild()
+rebuild_schemas()

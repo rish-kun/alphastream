@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.tests.conftest import MockResult
@@ -75,10 +73,15 @@ class TestSectorSentiment:
         sector_row = ("Banking & Finance", 0.45, 25)
 
         # First call: sector query returns one row
-        # Second call: top stocks query for that sector
+        # Second call: top stocks query for all sectors returning (sector, ticker)
         mock_db.execute.side_effect = [
             MockResult(data=[sector_row]),  # sector query
-            MockResult(data=[("HDFCBANK",), ("ICICIBANK",)]),  # top stocks
+            MockResult(
+                data=[
+                    ("Banking & Finance", "HDFCBANK"),
+                    ("Banking & Finance", "ICICIBANK"),
+                ]
+            ),  # top stocks
         ]
 
         resp = await client.get("/api/v1/sentiment/sectors")
@@ -99,13 +102,14 @@ class TestSentimentReanalysis:
         article_id = uuid.uuid4()
         mock_db.execute.return_value = MockResult(data=[article_id])
 
-        with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task:
+        with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task, \
+             patch("app.api.v1.sentiment.reanalysis_status_service.start_reanalysis") as mock_redis:
             mock_send_task.return_value = MagicMock(id="task-123")
+            mock_redis.return_value = None
 
             resp = await client.post(
                 "/api/v1/sentiment/reanalyze",
-                json={"article_ids": [str(article_id)],
-                      "force_reanalyze": True},
+                json={"article_ids": [str(article_id)], "force_reanalyze": True},
             )
 
         assert resp.status_code == 202
@@ -123,8 +127,7 @@ class TestSentimentReanalysis:
         with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task:
             resp = await client.post(
                 "/api/v1/sentiment/reanalyze",
-                json={"article_ids": [str(article_id)],
-                      "force_reanalyze": True},
+                json={"article_ids": [str(article_id)], "force_reanalyze": True},
             )
 
         assert resp.status_code == 202
