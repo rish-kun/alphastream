@@ -64,6 +64,13 @@ class NewsFeedQuery(BaseModel):
     to_date: datetime | None = None
 
 
-from app.schemas.sentiment import SentimentResponse
+def _rebuild_models():
+    from app.schemas.sentiment import SentimentResponse
 
-NewsArticleResponse.model_rebuild()
+    # Need to put SentimentResponse into the module namespace for pydantic to find it
+    import sys
+    sys.modules[__name__].SentimentResponse = SentimentResponse
+
+    NewsArticleResponse.model_rebuild()
+
+_rebuild_models()
