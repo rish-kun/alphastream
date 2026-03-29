@@ -1,0 +1,3 @@
+## 2024-03-29 - [Leveraging PostgreSQL DISTINCT ON for Efficient Deduplication]
+**Learning:** [In a PostgreSQL-backed application, performing ordered deduplication of historical records (like getting the most recent metric per time window) in Python memory is a performance anti-pattern. Fetching all records and looping through them creates unnecessary network overhead, higher database load, and increased memory pressure on the backend application.]
+**Action:** [Use SQLAlchemy's `.distinct(*columns)` combined with `.order_by()` to utilize PostgreSQL's `DISTINCT ON` feature natively. This pushes the deduplication down to the database level, drastically reducing the number of rows transferred over the network and lowering Python memory consumption.]
