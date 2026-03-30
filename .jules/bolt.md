@@ -1,0 +1,3 @@
+## 2026-03-03 - PostgreSQL DISTINCT ON with SQLAlchemy
+**Learning:** In the backend application using PostgreSQL, Python memory and processing overhead can be significantly reduced by using database-level deduplication. Specifically, calling `.distinct(*columns)` alongside `.order_by()` in SQLAlchemy translates directly to PostgreSQL's `DISTINCT ON`, allowing efficient fetching of the latest record per group without fetching large un-filtered datasets into Python memory.
+**Action:** When performing deduplication (e.g. keeping the most recent entry per window or per stock) in queries, use `.distinct(column)` along with the appropriate `.order_by()` clause instead of transferring all rows over the wire and deduplicating manually in Python.
