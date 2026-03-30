@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
 from app.models.news import ArticleStockMention, NewsArticle
-from app.models.sentiment import SentimentAnalysis
 from app.models.stock import Stock
 from app.schemas.news import NewsArticleResponse, NewsFeedQuery, NewsListResponse
 
