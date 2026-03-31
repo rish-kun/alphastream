@@ -1,10 +1,8 @@
 """Prioritized sentiment analysis tasks for deep research articles."""
 
 import logging
-from datetime import datetime
 from typing import List
 
-from celery import Task
 from sqlalchemy import text
 
 from pipeline.celery_app import app

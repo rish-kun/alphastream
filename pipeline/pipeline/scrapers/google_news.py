@@ -4,13 +4,12 @@ import logging
 import random
 import re
 import time
-from datetime import datetime, timedelta
-from urllib.parse import parse_qs, urljoin, urlparse
+from datetime import datetime
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
-from pipeline.config import settings
 
 logger = logging.getLogger(__name__)
 
