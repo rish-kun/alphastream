@@ -418,9 +418,13 @@ class TestResearchTopicTask:
             raise
 
 
+import pytest
+
+
 class TestDatabaseConnection:
     """Tests for database connection status."""
 
+    @pytest.mark.skip(reason="Requires a running PostgreSQL instance, which is not available in CI")
     def test_database_connection(self):
         """Test database connection and schema."""
         logger.info("=" * 80)

@@ -16,7 +16,7 @@ router = APIRouter(prefix="/stocks", tags=["stocks"])
 
 @router.get("/search", response_model=StockSearchResponse)
 async def search_stocks(
-    q: Annotated[str | None, Query(description="Search query")] = None,
+    q: Annotated[str, Query(description="Search query")],
     sector: Annotated[str | None, Query(description="Filter by sector")] = None,
     industry: Annotated[str | None, Query(description="Filter by industry")] = None,
     min_price: Annotated[
