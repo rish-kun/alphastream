@@ -1,0 +1,3 @@
+## 2026-03-03 - PostgreSQL DISTINCT ON for Time-Series Deduplication
+**Learning:** In the `get_stock_alpha` function, fetching all historical alpha metrics and deduplicating them in Python via `set` and a loop creates unnecessary memory pressure and large database payloads, especially as time-series data grows.
+**Action:** Always prefer pushing deduplication down to the database level when possible. For PostgreSQL-backed SQLAlchemy applications, using `.distinct(Column)` paired with an `.order_by(Column, OtherColumn.desc())` effectively compiles to `DISTINCT ON` and offloads the grouping/filtering work to the DB, ensuring only the exact required rows are transferred over the network and instantiated in Python memory.
