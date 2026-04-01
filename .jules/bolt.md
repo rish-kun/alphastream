@@ -1,0 +1,3 @@
+## 2026-03-03 - Fixing N+1 Queries with DISTINCT ON and Window Functions
+**Learning:** This codebase uses PostgreSQL and SQLAlchemy 2.0, which allows using `.distinct(*columns)` alongside `row_number()` for efficient intra-group deduplication and ranking. N+1 loops (e.g. querying child records for a set of items, like getting top stocks per sector) can be replaced using `DISTINCT ON` to deduplicate and `func.row_number().over(partition_by=...)` to limit the top N items per group without extra queries.
+**Action:** When identifying loop-based N+1 DB queries in FastAPI/SQLAlchemy endpoints fetching top N items per group, replace them with a single subquery-based `DISTINCT ON` and `row_number()` approach for better database performance and memory overhead.
