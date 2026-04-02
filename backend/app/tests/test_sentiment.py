@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.tests.conftest import MockResult
@@ -75,10 +73,10 @@ class TestSectorSentiment:
         sector_row = ("Banking & Finance", 0.45, 25)
 
         # First call: sector query returns one row
-        # Second call: top stocks query for that sector
+        # Second call: top stocks query for all sectors combined
         mock_db.execute.side_effect = [
             MockResult(data=[sector_row]),  # sector query
-            MockResult(data=[("HDFCBANK",), ("ICICIBANK",)]),  # top stocks
+            MockResult(data=[("Banking & Finance", "HDFCBANK"), ("Banking & Finance", "ICICIBANK")]),  # top stocks
         ]
 
         resp = await client.get("/api/v1/sentiment/sectors")
