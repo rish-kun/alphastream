@@ -15,7 +15,7 @@ import argparse
 import logging
 import sys
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime
 from typing import Any
 
 sys.path.insert(0, "/Users/rishit/Coding/alphastream/pipeline")
@@ -98,7 +98,7 @@ def test_database_connection() -> bool:
             print(f"  Schema check: READY ({len(_REQUIRED_TABLES)} required tables)")
             return True
         else:
-            print(f"  Schema check: NOT READY - run migrations")
+            print("  Schema check: NOT READY - run migrations")
             return False
 
     except Exception as e:
@@ -208,7 +208,7 @@ def test_run_scrapers(topic: str, limit: int = 5) -> list[dict[str, Any]]:
             scraper = article.get("scraper_source", "unknown")
             scraper_counts[scraper] = scraper_counts.get(scraper, 0) + 1
 
-        print(f"  Breakdown by scraper:")
+        print("  Breakdown by scraper:")
         for scraper, count in sorted(scraper_counts.items()):
             print(f"    - {scraper}: {count}")
 
@@ -249,7 +249,7 @@ def test_store_articles(
         print(f"  Article IDs: {len(article_ids)} IDs generated")
 
         if article_ids:
-            print(f"  Sample IDs:")
+            print("  Sample IDs:")
             for i, aid in enumerate(article_ids[:3], 1):
                 print(f"    {i}. {aid}")
             if len(article_ids) > 3:
@@ -291,7 +291,7 @@ def test_complete_research_flow(topic: str) -> dict[str, Any]:
 
         if result.status == "SUCCESS":
             data = result.result
-            print(f"  Results:")
+            print("  Results:")
             print(f"    - Status: {data.get('status')}")
             print(f"    - Topic: {data.get('topic')}")
             print(f"    - New articles: {data.get('new_articles')}")
@@ -332,25 +332,25 @@ def print_summary(
     """Print a summary of all test results."""
     print_header("TEST SUMMARY")
 
-    print(f"API Keys Configured:")
+    print("API Keys Configured:")
     for service, configured in api_keys.items():
         status = "YES" if configured else "NO"
         print(f"  - {service}: {status}")
 
-    print(f"\nDatabase:")
+    print("\nDatabase:")
     print(f"  - Connection: {'OK' if db_ready else 'FAILED'}")
     print(f"  - Schema: {'Ready' if db_ready else 'Not Ready'}")
 
-    print(f"\nScraper Results:")
+    print("\nScraper Results:")
     print(f"  - Firecrawl: {len(firecrawl_results)} articles")
     print(f"  - Thunderbit: {len(thunderbit_results)} articles")
     print(f"  - Browse.ai: {len(browseai_results)} articles")
     print(f"  - Combined: {len(combined_results)} articles")
 
-    print(f"\nStorage Results:")
+    print("\nStorage Results:")
     print(f"  - Stored: {store_results[0]} new articles")
 
-    print(f"\nComplete Flow:")
+    print("\nComplete Flow:")
     print(f"  - Status: {flow_results.get('status')}")
     if flow_results.get("status") == "success":
         print(f"  - New articles: {flow_results.get('new_articles')}")
@@ -401,7 +401,7 @@ def main() -> int:
     topic = args.topic
     limit = args.limit
 
-    print_header(f"Deep Research Debug Script")
+    print_header("Deep Research Debug Script")
     print(f"Topic: {topic}")
     print(f"Limit: {limit} results per scraper")
 

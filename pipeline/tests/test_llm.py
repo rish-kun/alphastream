@@ -1,7 +1,6 @@
 """Tests for LLM modules — Gemini, OpenRouter, RateLimiter, Prompts."""
 
 import json
-import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -50,7 +49,7 @@ class TestGeminiClient:
         with patch.dict(
             "sys.modules", {"google": MagicMock(), "google.genai": MagicMock()}
         ) as _:
-            with patch("pipeline.llm.gemini_client.genai", create=True) as mock_genai:
+            with patch("pipeline.llm.gemini_client.genai", create=True):
                 mock_client_obj = MagicMock()
                 mock_response = MagicMock()
                 mock_response.text = json.dumps(expected)

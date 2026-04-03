@@ -5,6 +5,7 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
+from typing import TYPE_CHECKING
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -68,3 +69,7 @@ class PortfolioStock(Base):
     stock: Mapped["Stock"] = relationship(
         "Stock", back_populates="portfolio_stocks", lazy="selectin"
     )
+
+
+if TYPE_CHECKING:
+    from app.models.stock import Stock
