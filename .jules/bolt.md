@@ -1,0 +1,3 @@
+## 2024-04-03 - [Optimize Deduplication in PostgreSQL Backend using DISTINCT ON]
+**Learning:** Found a codebase-specific optimization replacing manual Python deduplication loops and sets with PostgreSQL's `DISTINCT ON` feature combined with `ORDER BY`. Because the application is running exclusively against a PostgreSQL backend, `db.execute(select(...).distinct(*columns).order_by(...))` enables database-level deduplication which minimizes memory overhead and network payload.
+**Action:** Always prefer `DISTINCT ON` with `ORDER BY` for deduplication scenarios when querying latest records per group in this PostgreSQL-specific backend.
