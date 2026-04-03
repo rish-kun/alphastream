@@ -3,8 +3,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Numeric, String, func, text
+from sqlalchemy import BigInteger, DateTime, Numeric, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from typing import TYPE_CHECKING
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -44,3 +45,9 @@ class Stock(Base):
     portfolio_stocks: Mapped[list["PortfolioStock"]] = relationship(
         "PortfolioStock", back_populates="stock", lazy="selectin"
     )
+
+
+if TYPE_CHECKING:
+    from app.models.news import ArticleStockMention
+    from app.models.sentiment import AlphaMetric
+    from app.models.portfolio import PortfolioStock
