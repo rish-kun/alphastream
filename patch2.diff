@@ -1,0 +1,10 @@
+--- pipeline/tests/test_deep_research_debug.py
++++ pipeline/tests/test_deep_research_debug.py
+@@ -421,6 +421,7 @@
+ class TestDatabaseConnection:
+     """Tests for database connection status."""
+
++    @pytest.mark.skip(reason="Requires a live database connection")
+     def test_database_connection(self):
+         """Test database connection and schema."""
+         logger.info("=" * 80)
