@@ -1,0 +1,75 @@
+--- app/tests/test_auth.py
++++ app/tests/test_auth.py
+@@ -19,17 +19,13 @@
+
+-def _make_user(**overrides) -> MagicMock:
++def _make_user(**overrides) -> User:
+     """Create a mock User for testing."""
+     defaults = {
+         "id": TEST_USER_ID,
+         "email": TEST_USER_EMAIL,
+         "hashed_password": hash_password("SecurePassword123!"),
+         "full_name": TEST_USER_NAME,
+         "oauth_provider": None,
+         "oauth_id": None,
+         "gemini_api_key": None,
+         "openrouter_api_key": None,
+         "created_at": datetime.now(UTC),
+         "updated_at": datetime.now(UTC),
+     }
+     defaults.update(overrides)
+-    user = MagicMock(spec=User)
+-    for key, value in defaults.items():
+-        setattr(user, key, value)
+-    return user
++    return User(**defaults)
+
+
+@@ -52,9 +48,8 @@
+             instance.create_user = AsyncMock(return_value=new_user)
+-            instance.create_tokens = AsyncMock(
+-                return_value=MagicMock(
+-                    access_token="access-token",
+-                    refresh_token="refresh-token",
+-                    token_type="bearer",
+-                )
+-            )
++            class Tokens:
++                access_token="access-token"
++                refresh_token="refresh-token"
++                token_type="bearer"
++            instance.create_tokens = AsyncMock(return_value=Tokens())
+
+             resp = await unauthed_client.post(
+@@ -109,9 +104,8 @@
+             instance.authenticate_user = AsyncMock(return_value=user)
+-            instance.create_tokens = AsyncMock(
+-                return_value=MagicMock(
+-                    access_token="new-access-token",
+-                    refresh_token="new-refresh-token",
+-                    token_type="bearer",
+-                )
+-            )
++            class Tokens:
++                access_token="new-access-token"
++                refresh_token="new-refresh-token"
++                token_type="bearer"
++            instance.create_tokens = AsyncMock(return_value=Tokens())
+
+             resp = await unauthed_client.post(
+@@ -141,9 +135,8 @@
+             instance.verify_refresh_token = AsyncMock(return_value=user)
+-            instance.create_tokens = AsyncMock(
+-                return_value=MagicMock(
+-                    access_token="new-access-token",
+-                    refresh_token="new-refresh-token",
+-                    token_type="bearer",
+-                )
+-            )
++            class Tokens:
++                access_token="new-access-token"
++                refresh_token="new-refresh-token"
++                token_type="bearer"
++            instance.create_tokens = AsyncMock(return_value=Tokens())
+
+             resp = await unauthed_client.post(

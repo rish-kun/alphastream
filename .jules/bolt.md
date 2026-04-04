@@ -1,0 +1,3 @@
+## 2024-04-04 - Eliminate In-Memory Deduplication with DISTINCT ON
+**Learning:** For deduplicating objects (like grabbing the single most recent record in a group), using Python loops and sets (e.g. `seen_windows`) can result in pulling thousands of unneeded records into memory, especially if a stock has been heavily analyzed recently. Since PostgreSQL supports `DISTINCT ON` via `.distinct(*columns)` and `.order_by()`, this constraint can safely be pushed to the database.
+**Action:** Always check if group-level deductions can be resolved at the database layer (PostgreSQL supports `DISTINCT ON` via SQLAlchemy `.distinct(*columns)`) instead of transferring huge datasets into application memory just to discard most of them.

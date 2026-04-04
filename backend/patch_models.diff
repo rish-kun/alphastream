@@ -1,0 +1,81 @@
+--- app/models/news.py
++++ app/models/news.py
+@@ -1,7 +1,7 @@
+ from __future__ import annotations
+
+ import uuid
+-from typing import Any
++from typing import Any, TYPE_CHECKING
+
+ from sqlalchemy import (
+     BigInteger,
+@@ -16,6 +16,10 @@
+ from app.database import Base
+ from app.models.mixins import TimestampMixin
+
++if TYPE_CHECKING:
++    from app.models.sentiment import SentimentAnalysis
++    from app.models.stock import Stock
++
+
+ class NewsArticle(Base, TimestampMixin):
+     __tablename__ = "news_articles"
+--- app/models/portfolio.py
++++ app/models/portfolio.py
+@@ -1,7 +1,7 @@
+ from __future__ import annotations
+
+ import uuid
+-from typing import Any
++from typing import Any, TYPE_CHECKING
+
+ from sqlalchemy import ForeignKey, Numeric, String, UniqueConstraint, func
+ from sqlalchemy.dialects.postgresql import UUID
+@@ -9,6 +9,9 @@
+ from app.database import Base
+ from app.models.mixins import TimestampMixin
+
++if TYPE_CHECKING:
++    from app.models.stock import Stock
++
+
+ class Portfolio(Base, TimestampMixin):
+     __tablename__ = "portfolios"
+--- app/models/stock.py
++++ app/models/stock.py
+@@ -1,7 +1,7 @@
+ from __future__ import annotations
+
+ import uuid
+-from typing import Any
++from typing import Any, TYPE_CHECKING
+ from datetime import datetime
+
+ from sqlalchemy import BigInteger, DateTime, Numeric, String, text
+@@ -9,6 +9,11 @@
+
+ from app.database import Base
+
++if TYPE_CHECKING:
++    from app.models.news import ArticleStockMention
++    from app.models.sentiment import AlphaMetric
++    from app.models.portfolio import PortfolioStock
++
+
+ class Stock(Base):
+     __tablename__ = "stocks"
+--- app/schemas/news.py
++++ app/schemas/news.py
+@@ -64,6 +64,9 @@
+     to_date: datetime | None = None
+
+
+-from app.schemas.sentiment import SentimentResponse
+-
+-NewsArticleResponse.model_rebuild()
++def _rebuild_models():
++    from app.schemas.sentiment import SentimentResponse
++
++    NewsArticleResponse.model_rebuild(_types_namespace={'SentimentResponse': SentimentResponse})
++
++_rebuild_models()

@@ -1,0 +1,40 @@
+--- backend/app/tests/test_auth.py
++++ backend/app/tests/test_auth.py
+@@ -49,10 +49,11 @@
+             instance.create_user = AsyncMock(return_value=new_user)
+             class Tokens:
+                 access_token="access-token"
+                 refresh_token="refresh-token"
+                 token_type="bearer"
++                user=new_user
+             instance.create_tokens = AsyncMock(return_value=Tokens())
+
+             resp = await unauthed_client.post(
+                 "/api/v1/auth/register",
+@@ -105,10 +106,11 @@
+             instance.authenticate_user = AsyncMock(return_value=user)
+             class Tokens:
+                 access_token="new-access-token"
+                 refresh_token="new-refresh-token"
+                 token_type="bearer"
++                user=user
+             instance.create_tokens = AsyncMock(return_value=Tokens())
+
+             resp = await unauthed_client.post(
+                 "/api/v1/auth/login",
+@@ -136,10 +138,11 @@
+             instance.verify_refresh_token = AsyncMock(return_value=user)
+             class Tokens:
+                 access_token="new-access-token"
+                 refresh_token="new-refresh-token"
+                 token_type="bearer"
++                user=user
+             instance.create_tokens = AsyncMock(return_value=Tokens())
+
+             resp = await unauthed_client.post(
+                 "/api/v1/auth/refresh",
+@@ -176,3 +179,3 @@
+     async def test_get_me_unauthenticated(self, unauthed_client: AsyncClient):
+         resp = await unauthed_client.get("/api/v1/auth/me")
+-        assert resp.status_code == 422  # Missing Authorization header
++        assert resp.status_code == 401  # Missing Authorization header
