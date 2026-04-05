@@ -1,0 +1,3 @@
+## 2023-10-27 - PostgreSQL DISTINCT ON Performance Optimization
+**Learning:** In the backend application, Python-level loops were historically used to deduplicate large result sets retrieved from `AlphaMetric` queries. This loads unnecessary data into memory and increases database fetch times. Because the codebase uses PostgreSQL, SQLAlchemy's `.distinct(*columns)` alongside `order_by` translates directly into `DISTINCT ON`, making the DB engine handle deductions effortlessly without returning large redundant sets to Python.
+**Action:** Proactively replace similar in-memory set-based Python deduplication loops applied on ordered time-series query results with `DISTINCT ON` at the SQLAlchemy level.
