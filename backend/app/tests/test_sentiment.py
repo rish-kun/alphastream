@@ -97,8 +97,10 @@ class TestSentimentReanalysis:
         article_id = uuid.uuid4()
         mock_db.execute.return_value = MockResult(data=[article_id])
 
-        with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task:
+        with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task, \
+             patch("app.api.v1.sentiment.reanalysis_status_service.start_reanalysis") as mock_start:
             mock_send_task.return_value = MagicMock(id="task-123")
+            mock_start.return_value = None
 
             resp = await client.post(
                 "/api/v1/sentiment/reanalyze",
