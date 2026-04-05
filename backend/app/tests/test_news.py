@@ -6,7 +6,6 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.core.exceptions import NotFoundError
@@ -108,8 +107,10 @@ class TestGetNewsFeed:
         resp = await client.get("/api/v1/news/?page=0")
         assert resp.status_code == 422
 
-    async def test_invalid_page_size(self, client: AsyncClient):
-        resp = await client.get("/api/v1/news/?page_size=100")
+    async def test_invalid_page_size(self, client: AsyncClient, mock_db: AsyncMock):
+        from app.tests.conftest import MockResult
+        mock_db.execute.return_value = MockResult(scalar=0)
+        resp = await client.get("/api/v1/news/?page_size=2000")
         assert resp.status_code == 422
 
 
