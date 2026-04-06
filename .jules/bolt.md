@@ -1,0 +1,3 @@
+## 2025-03-03 - Database-level Deduplication in PostgreSQL
+**Learning:** In a PostgreSQL-backed backend, deduplicating fetched records in-memory via loops and sets consumes excessive Python memory and delays garbage collection when fetching the "latest N items per group".
+**Action:** Use SQLAlchemy's `.distinct(*columns)` combined with matching `.order_by(*columns, ...)` to utilize PostgreSQL's `DISTINCT ON`. This shifts the deduplication to the database layer directly, increasing efficiency and reducing application memory overhead. Ensure you don't inadvertently modify semantics when applying this, specifically confirming it's applied when retrieving the *latest* item of a subset.
