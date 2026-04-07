@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import NotFoundError
 from app.models.news import ArticleStockMention, NewsArticle
-from app.models.sentiment import AlphaMetric, SentimentAnalysis
+from app.models.sentiment import AlphaMetric
 from app.models.stock import Stock
 from app.schemas.stock import (
     StockDetail,
@@ -180,18 +180,22 @@ class StockService:
                     reverse=True,
                 )[0]
 
-            articles_with_sentiment.append({
-                "id": article.id,
-                "title": article.title,
-                "summary": article.summary,
-                "url": article.url,
-                "source": article.source,
-                "published_at": article.published_at,
-                "category": article.category,
-                "sentiment_score": float(sentiment.sentiment_score) if sentiment else None,
-                "confidence": float(sentiment.confidence) if sentiment else None,
-                "impact_timeline": sentiment.impact_timeline if sentiment else None,
-            })
+            articles_with_sentiment.append(
+                {
+                    "id": article.id,
+                    "title": article.title,
+                    "summary": article.summary,
+                    "url": article.url,
+                    "source": article.source,
+                    "published_at": article.published_at,
+                    "category": article.category,
+                    "sentiment_score": float(sentiment.sentiment_score)
+                    if sentiment
+                    else None,
+                    "confidence": float(sentiment.confidence) if sentiment else None,
+                    "impact_timeline": sentiment.impact_timeline if sentiment else None,
+                }
+            )
 
         return StockNewsResponse(
             articles=articles_with_sentiment,

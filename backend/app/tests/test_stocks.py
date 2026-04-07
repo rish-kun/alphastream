@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.core.exceptions import NotFoundError
@@ -73,6 +72,7 @@ class TestSearchStocks:
 
     async def test_search_requires_query(self, client: AsyncClient, mock_db: AsyncMock):
         from app.schemas.stock import StockSearchResponse
+
         with patch("app.api.v1.stocks.StockService") as MockService:
             instance = MockService.return_value
             instance.search_stocks = AsyncMock(

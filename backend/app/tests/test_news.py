@@ -6,7 +6,6 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.core.exceptions import NotFoundError

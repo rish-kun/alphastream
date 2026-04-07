@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import uuid
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 
-from app.core.security import create_access_token, create_refresh_token, hash_password
+from app.core.security import create_refresh_token, hash_password
 from app.models.user import User
 from app.tests.conftest import TEST_USER_EMAIL, TEST_USER_ID, TEST_USER_NAME, MockResult
 
@@ -50,6 +48,7 @@ class TestRegister:
             instance = MockService.return_value
             instance.create_user = AsyncMock(return_value=new_user)
             from app.schemas.user import TokenResponse
+
             instance.create_tokens = AsyncMock(
                 return_value=TokenResponse(
                     user=new_user,
@@ -110,6 +109,7 @@ class TestLogin:
             instance = MockService.return_value
             instance.authenticate_user = AsyncMock(return_value=user)
             from app.schemas.user import TokenResponse
+
             instance.create_tokens = AsyncMock(
                 return_value=TokenResponse(
                     user=user,
@@ -144,6 +144,7 @@ class TestRefresh:
 
         with patch("app.api.v1.auth.AuthService") as MockService:
             from app.schemas.user import TokenResponse
+
             instance = MockService.return_value
             instance.refresh_token = AsyncMock(
                 return_value=TokenResponse(
