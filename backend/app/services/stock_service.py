@@ -212,24 +212,21 @@ class StockService:
 
         # Get latest alpha metrics, ordered by computed_at desc
         # Use distinct on window_hours to get only the most recent per window
+        # ⚡ Bolt Optimization: Using PostgreSQL DISTINCT ON via .distinct(AlphaMetric.window_hours)
+        # to deduplicate alpha metrics at the database level instead of in-memory.
+        # Expected Impact: Drastically reduces DB I/O and memory overhead by only fetching
+        # the required records per window instead of the entire metric history.
         metrics_stmt = (
             select(AlphaMetric)
             .where(AlphaMetric.stock_id == stock.id)
+            .distinct(AlphaMetric.window_hours)
             .order_by(
                 AlphaMetric.window_hours,
                 AlphaMetric.computed_at.desc(),
             )
         )
         metrics_result = await self.db.execute(metrics_stmt)
-        all_metrics = metrics_result.scalars().all()
-
-        # Deduplicate: keep only the latest per window_hours
-        seen_windows: set[int] = set()
-        metrics = []
-        for m in all_metrics:
-            if m.window_hours not in seen_windows:
-                seen_windows.add(m.window_hours)
-                metrics.append(m)
+        metrics = metrics_result.scalars().all()
 
         return {
             "stock": stock.ticker,
