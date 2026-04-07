@@ -93,8 +93,9 @@ class TestSectorSentiment:
 
 
 class TestSentimentReanalysis:
+    @patch("app.api.v1.sentiment.reanalysis_status_service.start_reanalysis")
     async def test_reanalyze_dispatches_existing_articles(
-        self, client: AsyncClient, mock_db: AsyncMock
+        self, mock_start_reanalysis, client: AsyncClient, mock_db: AsyncMock
     ):
         article_id = uuid.uuid4()
         mock_db.execute.return_value = MockResult(data=[article_id])

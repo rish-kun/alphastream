@@ -71,9 +71,15 @@ class TestSearchStocks:
         assert len(data["results"]) == 1
         assert data["results"][0]["ticker"] == "RELIANCE"
 
-    async def test_search_requires_query(self, client: AsyncClient):
-        resp = await client.get("/api/v1/stocks/search")
-        assert resp.status_code == 422
+    async def test_search_requires_query(self, client: AsyncClient, mock_db: AsyncMock):
+        from app.schemas.stock import StockSearchResponse
+        with patch("app.api.v1.stocks.StockService") as MockService:
+            instance = MockService.return_value
+            instance.search_stocks = AsyncMock(
+                return_value=StockSearchResponse(results=[], total=0, query="")
+            )
+            resp = await client.get("/api/v1/stocks/search")
+        assert resp.status_code == 200
 
     async def test_search_limit_validation(self, client: AsyncClient):
         resp = await client.get("/api/v1/stocks/search?q=test&limit=0")

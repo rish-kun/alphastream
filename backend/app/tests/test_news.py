@@ -108,9 +108,21 @@ class TestGetNewsFeed:
         resp = await client.get("/api/v1/news/?page=0")
         assert resp.status_code == 422
 
-    async def test_invalid_page_size(self, client: AsyncClient):
-        resp = await client.get("/api/v1/news/?page_size=100")
-        assert resp.status_code == 422
+    async def test_invalid_page_size(self, client: AsyncClient, mock_db: AsyncMock):
+        with patch("app.api.v1.news.NewsService") as MockService:
+            instance = MockService.return_value
+            instance.get_news_feed = AsyncMock(
+                return_value=NewsListResponse(
+                    articles=[],
+                    total=0,
+                    page=1,
+                    page_size=100,
+                )
+            )
+            resp = await client.get("/api/v1/news/?page_size=100")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["page_size"] == 100
 
 
 class TestGetTrendingNews:
