@@ -65,6 +65,7 @@ class SentimentTaskStatusResponse(BaseModel):
     result: dict | None = None
     error: str | None = None
 
+
 class ArticleReanalysisStatusResponse(BaseModel):
     article_id: str
     status: str
@@ -75,7 +76,6 @@ class ArticleReanalysisStatusResponse(BaseModel):
     progress: dict | None = None
     result: dict | None = None
     error: str | None = None
-
 
 
 @router.get("/overview", response_model=SentimentOverview)
@@ -276,8 +276,7 @@ async def reanalyze_articles_sentiment(
     existing_rows = await db.execute(
         select(NewsArticle.id).where(NewsArticle.id.in_(body.article_ids))
     )
-    existing_ids = {str(article_id)
-                    for article_id in existing_rows.scalars().all()}
+    existing_ids = {str(article_id) for article_id in existing_rows.scalars().all()}
 
     task_ids: list[str] = []
     skipped: list[uuid.UUID] = []
@@ -294,7 +293,7 @@ async def reanalyze_articles_sentiment(
             kwargs={"force_reanalyze": body.force_reanalyze},
         )
         task_ids.append(task.id)
-        
+
         # Track reanalysis status in Redis
         await reanalysis_status_service.start_reanalysis(
             article_id=article_id_str,
@@ -375,6 +374,7 @@ async def get_reanalyze_all_status(
         progress=result.info if isinstance(result.info, dict) else None,
     )
 
+
 @router.get(
     "/reanalyze/article/{article_id}/status",
     response_model=ArticleReanalysisStatusResponse,
@@ -385,13 +385,13 @@ async def get_article_reanalysis_status(
 ) -> ArticleReanalysisStatusResponse:
     """Get the reanalysis status for a specific article."""
     status_data = await reanalysis_status_service.get_status(article_id)
-    
+
     if not status_data:
         return ArticleReanalysisStatusResponse(
             article_id=article_id,
             status="not_found",
         )
-    
+
     return ArticleReanalysisStatusResponse(
         article_id=status_data.get("article_id", article_id),
         status=status_data.get("status", "unknown"),

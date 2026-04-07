@@ -1,0 +1,3 @@
+## 2026-03-03 - Database Level Deduplication with DISTINCT ON
+**Learning:** This codebase uses PostgreSQL, which supports `DISTINCT ON`. A common performance anti-pattern found was fetching all historical records for a group (e.g., all alpha metrics for a stock) and deduplicating them in-memory using a Python loop to find the latest per window. This causes unnecessary database I/O and Python memory overhead.
+**Action:** Use SQLAlchemy's `.distinct(*columns)` combined with `.order_by()` to push the deduplication to the database level, fetching only the required records efficiently.
