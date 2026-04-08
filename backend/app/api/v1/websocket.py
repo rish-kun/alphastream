@@ -4,11 +4,9 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import verify_token
 from app.database import get_db
@@ -121,11 +119,9 @@ async def ws_news_feed(websocket: WebSocket) -> None:
             await websocket.send_json(initial_payload)
             break
 
-        redis_task = asyncio.create_task(
-            manager.subscribe_redis(channel, websocket))
+        redis_task = asyncio.create_task(manager.subscribe_redis(channel, websocket))
 
-        keepalive_task = asyncio.create_task(
-            keepalive_loop(websocket, stop_event))
+        keepalive_task = asyncio.create_task(keepalive_loop(websocket, stop_event))
 
         try:
             while True:
@@ -235,11 +231,9 @@ async def ws_stock_updates(websocket: WebSocket, ticker: str) -> None:
             await websocket.send_json(initial_payload)
             break
 
-        redis_task = asyncio.create_task(
-            manager.subscribe_redis(channel, websocket))
+        redis_task = asyncio.create_task(manager.subscribe_redis(channel, websocket))
 
-        keepalive_task = asyncio.create_task(
-            keepalive_loop(websocket, stop_event))
+        keepalive_task = asyncio.create_task(keepalive_loop(websocket, stop_event))
 
         try:
             while True:
@@ -328,8 +322,7 @@ async def ws_portfolio_updates(websocket: WebSocket, portfolio_id: str) -> None:
                 position_value = current_price * h.quantity
                 position_cost = cost * h.quantity
                 pnl = position_value - position_cost
-                pnl_pct = (pnl / position_cost *
-                           100) if position_cost > 0 else 0.0
+                pnl_pct = (pnl / position_cost * 100) if position_cost > 0 else 0.0
 
                 total_value += position_value
                 total_cost += position_cost
@@ -354,8 +347,7 @@ async def ws_portfolio_updates(websocket: WebSocket, portfolio_id: str) -> None:
                 )
 
             total_pnl = total_value - total_cost
-            total_pnl_pct = (total_pnl / total_cost *
-                             100) if total_cost > 0 else 0.0
+            total_pnl_pct = (total_pnl / total_cost * 100) if total_cost > 0 else 0.0
 
             initial_payload = {
                 "type": "portfolio_data",
@@ -379,11 +371,9 @@ async def ws_portfolio_updates(websocket: WebSocket, portfolio_id: str) -> None:
             await websocket.send_json(initial_payload)
             break
 
-        redis_task = asyncio.create_task(
-            manager.subscribe_redis(channel, websocket))
+        redis_task = asyncio.create_task(manager.subscribe_redis(channel, websocket))
 
-        keepalive_task = asyncio.create_task(
-            keepalive_loop(websocket, stop_event))
+        keepalive_task = asyncio.create_task(keepalive_loop(websocket, stop_event))
 
         try:
             while True:
