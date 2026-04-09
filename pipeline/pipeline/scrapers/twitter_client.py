@@ -6,7 +6,6 @@ API limitations, rate limiting, and frequent changes to the platform.
 
 import logging
 import os
-from datetime import datetime, timezone
 
 import httpx
 
