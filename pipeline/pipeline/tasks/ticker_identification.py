@@ -2,7 +2,6 @@
 
 import logging
 import re
-from typing import Optional
 
 from celery import Task
 from sqlalchemy import text
