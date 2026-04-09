@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError
 from app.schemas.portfolio import PortfolioResponse
-from app.tests.conftest import TEST_USER_ID
 
 
 def _make_portfolio_response(**overrides) -> PortfolioResponse:

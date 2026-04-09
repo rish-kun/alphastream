@@ -6,7 +6,6 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.core.exceptions import NotFoundError
@@ -109,7 +108,7 @@ class TestGetNewsFeed:
         assert resp.status_code == 422
 
     async def test_invalid_page_size(self, client: AsyncClient):
-        resp = await client.get("/api/v1/news/?page_size=100")
+        resp = await client.get("/api/v1/news/?page_size=10001")
         assert resp.status_code == 422
 
 
