@@ -1,0 +1,3 @@
+## 2024-05-18 - PostgreSQL DISTINCT ON for In-Memory Deduplication
+**Learning:** In backend operations that require deduplicating rows across historical windows (like fetching the latest metric per time window), doing this in Python using a `set()` can cause massive memory overhead and fetch unnecessary rows over time. SQLAlchemy `.distinct(*columns)` correctly translates to PostgreSQL's `DISTINCT ON` feature to offload this entirely to the DB.
+**Action:** When seeing manual Python deduplication loops iterating over SQLAlchemy result sets ordered by date, immediately replace them with `.distinct(group_by_col)` and `.order_by(group_by_col, sort_col.desc())` if using Postgres.
