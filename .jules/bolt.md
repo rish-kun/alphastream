@@ -1,0 +1,3 @@
+## 2026-03-03 - Use PostgreSQL DISTINCT ON for query deduplication
+**Learning:** In the backend, deduplication of records from PostgreSQL by a certain group (e.g. latest alpha metrics by window_hours) was previously done in Python memory using `set`s. Since the backend relies on PostgreSQL, using SQLAlchemy's `.distinct(*columns)` alongside `.order_by(*columns, ...)` issues a `DISTINCT ON` query. This is significantly faster and uses less memory than fetching all records and deduplicating in Python.
+**Action:** When fetching the top N items per group in the PostgreSQL backend, always use `DISTINCT ON` via SQLAlchemy `.distinct(*columns)` rather than in-memory Python deduplication.
