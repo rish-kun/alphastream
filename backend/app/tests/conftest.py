@@ -169,6 +169,9 @@ class MockResult:
     def unique(self):
         return self
 
+    def any(self):
+        return bool(self._data)
+
     def scalar_one_or_none(self):
         return self._scalar
 
