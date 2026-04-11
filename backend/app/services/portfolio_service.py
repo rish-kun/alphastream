@@ -206,18 +206,17 @@ class PortfolioService:
             return {"portfolio_id": str(portfolio_id), "articles": []}
 
         # Get recent news articles mentioning those stocks
+        # Optimization: use EXISTS to avoid duplicate article rows and Python-side .unique() overhead
         articles_stmt = (
             select(NewsArticle)
-            .join(
-                ArticleStockMention,
-                ArticleStockMention.article_id == NewsArticle.id,
+            .where(
+                NewsArticle.mentions.any(ArticleStockMention.stock_id.in_(stock_ids))
             )
-            .where(ArticleStockMention.stock_id.in_(stock_ids))
             .order_by(NewsArticle.published_at.desc())
             .limit(50)
         )
         articles_result = await self.db.execute(articles_stmt)
-        articles = articles_result.scalars().unique().all()
+        articles = articles_result.scalars().all()
 
         return {
             "portfolio_id": str(portfolio_id),
