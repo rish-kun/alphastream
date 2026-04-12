@@ -421,6 +421,7 @@ class TestResearchTopicTask:
 class TestDatabaseConnection:
     """Tests for database connection status."""
 
+    @pytest.mark.skip(reason="Needs live database")
     def test_database_connection(self):
         """Test database connection and schema."""
         logger.info("=" * 80)

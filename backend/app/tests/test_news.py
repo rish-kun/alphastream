@@ -6,7 +6,6 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.core.exceptions import NotFoundError
@@ -109,7 +108,22 @@ class TestGetNewsFeed:
         assert resp.status_code == 422
 
     async def test_invalid_page_size(self, client: AsyncClient):
-        resp = await client.get("/api/v1/news/?page_size=100")
+        with patch("app.api.v1.news.NewsService"):
+            # Should fail validation because page_size limit is 100 or something in the query param (wait, it says le=1000 in api/v1/news.py)
+            # Actually, the error in CI was a 500 error due to coroutine has no attribute all because we mocked something wrong?
+            # Wait, the failure is: AttributeError: 'coroutine' object has no attribute 'all'. This means the test didn't mock NewsService and hit the actual implementation!
+            # Since mock_db is used, db.execute returns AsyncMock, and .scalars().all() fails.
+            pass
+        # Let's fix this properly.
+
+        with patch("app.api.v1.news.NewsService") as MockService:
+            # We mock the service so it doesn't execute the real method.
+            # Wait, why did page_size=100 return 422 before? It shouldn't, limit is 1000.
+            # If the test expected 422 for page_size=100, maybe the author assumed a limit of 50.
+            # Let's just use page_size=2000 which will definitely trigger a 422 because le=1000.
+            pass
+
+        resp = await client.get("/api/v1/news/?page_size=2000")
         assert resp.status_code == 422
 
 
