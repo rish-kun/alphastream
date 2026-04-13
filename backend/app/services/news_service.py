@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
 from app.models.news import ArticleStockMention, NewsArticle
-from app.models.sentiment import SentimentAnalysis
 from app.models.stock import Stock
 from app.schemas.news import NewsArticleResponse, NewsFeedQuery, NewsListResponse
 
@@ -65,23 +64,13 @@ class NewsService:
                 )
 
         if query.ticker:
-            # Join through article_stock_mentions to filter by ticker
-            base_stmt = base_stmt.join(
-                ArticleStockMention,
-                ArticleStockMention.article_id == NewsArticle.id,
-            ).join(
-                Stock,
-                Stock.id == ArticleStockMention.stock_id,
+            conditions.append(
+                NewsArticle.mentions.any(
+                    ArticleStockMention.stock.has(
+                        func.lower(Stock.ticker) == func.lower(query.ticker)
+                    )
+                )
             )
-            count_stmt = count_stmt.join(
-                ArticleStockMention,
-                ArticleStockMention.article_id == NewsArticle.id,
-            ).join(
-                Stock,
-                Stock.id == ArticleStockMention.stock_id,
-            )
-            conditions.append(func.lower(Stock.ticker) == func.lower(query.ticker))
-            base_stmt = base_stmt.distinct()
 
         if conditions:
             base_stmt = base_stmt.where(and_(*conditions))
