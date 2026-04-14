@@ -1,0 +1,3 @@
+## 2025-04-14 - Fixing N+1 Duplicate rows python-side `.unique()` overhead and limit bug
+**Learning:** Using `JOIN` for 1-to-many relationship filtering (e.g. `NewsArticle` to `ArticleStockMention`) followed by python-side `unique()` will return an incorrect result count if an SQL `.limit()` is applied, because SQL `.limit()` gets applied before Python removes the duplicate rows. Additionally, applying python-side deduplication requires memory overhead.
+**Action:** Use `.any()` on the relationship field instead of a `JOIN`, which generates an SQL `EXISTS` subquery. This prevents SQL from duplicating the main rows, so `.limit()` produces the correct number of unique objects directly from the database and python-side `unique()` overhead is no longer needed.
