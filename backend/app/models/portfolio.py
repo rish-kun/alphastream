@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.stock import Stock
+    from app.models.portfolio import PortfolioStock
+
+
 import uuid
 from datetime import datetime
 

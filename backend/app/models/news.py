@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.sentiment import SentimentAnalysis
+    from app.models.stock import Stock
+    from app.models.news import ArticleStockMention
+
+
 import uuid
 from datetime import datetime
 

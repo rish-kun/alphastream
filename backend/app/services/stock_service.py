@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import NotFoundError
 from app.models.news import ArticleStockMention, NewsArticle
-from app.models.sentiment import AlphaMetric, SentimentAnalysis
+from app.models.sentiment import AlphaMetric
 from app.models.stock import Stock
 from app.schemas.stock import (
     StockDetail,
@@ -180,18 +180,22 @@ class StockService:
                     reverse=True,
                 )[0]
 
-            articles_with_sentiment.append({
-                "id": article.id,
-                "title": article.title,
-                "summary": article.summary,
-                "url": article.url,
-                "source": article.source,
-                "published_at": article.published_at,
-                "category": article.category,
-                "sentiment_score": float(sentiment.sentiment_score) if sentiment else None,
-                "confidence": float(sentiment.confidence) if sentiment else None,
-                "impact_timeline": sentiment.impact_timeline if sentiment else None,
-            })
+            articles_with_sentiment.append(
+                {
+                    "id": article.id,
+                    "title": article.title,
+                    "summary": article.summary,
+                    "url": article.url,
+                    "source": article.source,
+                    "published_at": article.published_at,
+                    "category": article.category,
+                    "sentiment_score": float(sentiment.sentiment_score)
+                    if sentiment
+                    else None,
+                    "confidence": float(sentiment.confidence) if sentiment else None,
+                    "impact_timeline": sentiment.impact_timeline if sentiment else None,
+                }
+            )
 
         return StockNewsResponse(
             articles=articles_with_sentiment,
@@ -211,25 +215,19 @@ class StockService:
             raise NotFoundError("Stock", ticker)
 
         # Get latest alpha metrics, ordered by computed_at desc
-        # Use distinct on window_hours to get only the most recent per window
+        # Use distinct on window_hours to get only the most recent per window directly from DB
+        # This prevents fetching potentially thousands of historical rows into Python memory
         metrics_stmt = (
             select(AlphaMetric)
             .where(AlphaMetric.stock_id == stock.id)
+            .distinct(AlphaMetric.window_hours)
             .order_by(
                 AlphaMetric.window_hours,
                 AlphaMetric.computed_at.desc(),
             )
         )
         metrics_result = await self.db.execute(metrics_stmt)
-        all_metrics = metrics_result.scalars().all()
-
-        # Deduplicate: keep only the latest per window_hours
-        seen_windows: set[int] = set()
-        metrics = []
-        for m in all_metrics:
-            if m.window_hours not in seen_windows:
-                seen_windows.add(m.window_hours)
-                metrics.append(m)
+        metrics = metrics_result.scalars().all()
 
         return {
             "stock": stock.ticker,
