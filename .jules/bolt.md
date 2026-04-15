@@ -1,0 +1,3 @@
+## 2026-03-03 - Avoid Python-side deduplication using PostgreSQL DISTINCT ON
+**Learning:** In the SQLAlchemy backend relying on PostgreSQL, doing Python-side deduplication of time-series records (e.g. keeping only the latest `AlphaMetric` per `window_hours`) requires fetching potentially thousands of historical rows into Python memory first. This is extremely inefficient and limits scale.
+**Action:** Always use `.distinct(*columns)` combined with `.order_by()` in SQLAlchemy when querying PostgreSQL to perform query-level deduplication (translates to `DISTINCT ON`). This fetches only the required records and significantly minimizes Python memory overhead and DB transport time.
