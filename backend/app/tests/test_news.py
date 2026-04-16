@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient
 
 from app.core.exceptions import NotFoundError
+from app.tests.conftest import MockResult
 from app.schemas.news import NewsArticleResponse, NewsListResponse
 
 
@@ -107,8 +108,9 @@ class TestGetNewsFeed:
         resp = await client.get("/api/v1/news/?page=0")
         assert resp.status_code == 422
 
-    async def test_invalid_page_size(self, client: AsyncClient):
-        resp = await client.get("/api/v1/news/?page_size=100")
+    async def test_invalid_page_size(self, client: AsyncClient, mock_db: AsyncMock):
+        mock_db.execute.return_value = MockResult()
+        resp = await client.get("/api/v1/news/?page_size=1001")
         assert resp.status_code == 422
 
 
