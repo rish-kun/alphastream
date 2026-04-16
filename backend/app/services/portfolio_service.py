@@ -206,18 +206,15 @@ class PortfolioService:
             return {"portfolio_id": str(portfolio_id), "articles": []}
 
         # Get recent news articles mentioning those stocks
+        # Optimization: Use EXISTS via .any() to avoid DB duplicates and Python-side .unique()
         articles_stmt = (
             select(NewsArticle)
-            .join(
-                ArticleStockMention,
-                ArticleStockMention.article_id == NewsArticle.id,
-            )
-            .where(ArticleStockMention.stock_id.in_(stock_ids))
+            .where(NewsArticle.mentions.any(ArticleStockMention.stock_id.in_(stock_ids)))
             .order_by(NewsArticle.published_at.desc())
             .limit(50)
         )
         articles_result = await self.db.execute(articles_stmt)
-        articles = articles_result.scalars().unique().all()
+        articles = articles_result.scalars().all()
 
         return {
             "portfolio_id": str(portfolio_id),
@@ -252,11 +249,13 @@ class PortfolioService:
             return {"portfolio_id": str(portfolio_id), "metrics": []}
 
         # Get latest alpha metrics for those stocks
+        # Optimization: use DISTINCT ON to get exactly one latest metric per stock efficiently
         metrics_stmt = (
             select(AlphaMetric, Stock.ticker, Stock.company_name)
+            .distinct(AlphaMetric.stock_id)
             .join(Stock, Stock.id == AlphaMetric.stock_id)
             .where(AlphaMetric.stock_id.in_(stock_ids))
-            .order_by(AlphaMetric.computed_at.desc())
+            .order_by(AlphaMetric.stock_id, AlphaMetric.computed_at.desc())
             .limit(100)
         )
         metrics_result = await self.db.execute(metrics_stmt)
