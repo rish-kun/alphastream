@@ -2,6 +2,7 @@
 
 import json
 import logging
+from datetime import datetime, timezone
 from math import ceil
 from typing import Any
 
@@ -9,7 +10,6 @@ from celery import Task
 from sqlalchemy import text
 
 from pipeline.celery_app import app
-import asyncio
 
 # Import for reanalysis status tracking
 try:
@@ -34,7 +34,7 @@ async def _update_reanalysis_status(article_id: str, status: str, **kwargs) -> N
         return
     
     try:
-        from app.config import settings
+        from pipeline.config import settings
         redis = redis_lib.Redis.from_url(settings.REDIS_URL, decode_responses=True)
         key = f"reanalysis:article:{article_id}"
         
@@ -450,6 +450,7 @@ def analyze_article(self: Task, article_id: str, force_reanalyze: bool = False) 
 
         # Update reanalysis status
         try:
+            import asyncio
             asyncio.run(_update_reanalysis_status(
                 article_id,
                 "completed",
