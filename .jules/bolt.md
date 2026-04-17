@@ -1,0 +1,3 @@
+## 2023-10-27 - [Optimization] Use `.any()` (EXISTS) over `.join()` for One-to-Many Filter and Limits
+**Learning:** In SQLAlchemy, applying `.limit()` *after* a `.join()` on a one-to-many relationship fetches duplicate root entities, leading to two problems: 1) The DB-level `.limit()` applies to the multiplied rows, meaning fewer distinct items than intended are fetched; and 2) We pay a penalty for Python-side deduplication via `.unique()`.
+**Action:** Always favor `.any()` (which translates to `EXISTS`) over `.join()` when just filtering on a relation, to guarantee unique DB rows and properly working DB-level limits before data is sent to Python.
