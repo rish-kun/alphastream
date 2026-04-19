@@ -1,0 +1,3 @@
+## 2023-10-27 - [Avoid duplicate rows when filtering one-to-many relationships]
+**Learning:** Using `.join()` to filter by a one-to-many relationship causes SQLAlchemy to expand rows, which then requires Python-side `.unique()` or `.distinct()`. If `.limit()` is applied *before* `.unique()`, the query will return fewer total distinct records than requested.
+**Action:** When filtering a query by checking if *any* related records match a condition, use `.where(Parent.relationship.any(Condition))` instead of `.join()`. This translates to a SQL `EXISTS` subquery, which stops searching at the first match, avoiding N+1 duplication completely and ensuring `LIMIT` limits the correct parent records.

@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import NotFoundError
 from app.models.news import ArticleStockMention, NewsArticle
-from app.models.sentiment import AlphaMetric, SentimentAnalysis
+from app.models.sentiment import AlphaMetric
 from app.models.stock import Stock
 from app.schemas.stock import (
     StockDetail,
@@ -135,14 +135,11 @@ class StockService:
             raise NotFoundError("Stock", ticker)
 
         # Count total articles for this stock
+        # Bolt optimization: Use EXISTS subquery to avoid duplicate row expansion
         count_stmt = (
             select(func.count())
             .select_from(NewsArticle)
-            .join(
-                ArticleStockMention,
-                ArticleStockMention.article_id == NewsArticle.id,
-            )
-            .where(ArticleStockMention.stock_id == stock.id)
+            .where(NewsArticle.mentions.any(ArticleStockMention.stock_id == stock.id))
         )
         count_result = await self.db.execute(count_stmt)
         total = count_result.scalar_one()
@@ -151,11 +148,7 @@ class StockService:
         offset = (page - 1) * page_size
         articles_stmt = (
             select(NewsArticle)
-            .join(
-                ArticleStockMention,
-                ArticleStockMention.article_id == NewsArticle.id,
-            )
-            .where(ArticleStockMention.stock_id == stock.id)
+            .where(NewsArticle.mentions.any(ArticleStockMention.stock_id == stock.id))
             .order_by(NewsArticle.published_at.desc())
             .offset(offset)
             .limit(page_size)
