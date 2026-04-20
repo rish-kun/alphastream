@@ -6,9 +6,8 @@ mocked so these tests run fully offline.
 
 from contextlib import contextmanager
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 # ---------------------------------------------------------------------------
