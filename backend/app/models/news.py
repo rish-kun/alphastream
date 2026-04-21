@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import uuid
 from datetime import datetime
@@ -70,3 +71,8 @@ class ArticleStockMention(Base):
     stock: Mapped["Stock"] = relationship(
         "Stock", back_populates="mentions", lazy="selectin"
     )
+
+
+if TYPE_CHECKING:
+    from app.models.sentiment import SentimentAnalysis
+    from app.models.stock import Stock

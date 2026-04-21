@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import uuid
 from datetime import datetime
@@ -68,3 +69,7 @@ class PortfolioStock(Base):
     stock: Mapped["Stock"] = relationship(
         "Stock", back_populates="portfolio_stocks", lazy="selectin"
     )
+
+
+if TYPE_CHECKING:
+    from app.models.stock import Stock

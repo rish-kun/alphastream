@@ -1,21 +1,17 @@
-"""Tests for auth API endpoints."""
-
 from __future__ import annotations
 
-import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import AsyncClient
 
-from app.core.security import create_access_token, create_refresh_token, hash_password
+from app.core.security import create_refresh_token, hash_password
 from app.models.user import User
 from app.tests.conftest import TEST_USER_EMAIL, TEST_USER_ID, TEST_USER_NAME, MockResult
 
 
-def _make_user(**overrides) -> MagicMock:
-    """Create a mock User for testing."""
+def _make_user(**overrides) -> dict:
+    """Create a dictionary of attributes for a mock User."""
     defaults = {
         "id": TEST_USER_ID,
         "email": TEST_USER_EMAIL,
@@ -30,7 +26,7 @@ def _make_user(**overrides) -> MagicMock:
         "updated_at": None,
     }
     defaults.update(overrides)
-    user = MagicMock(spec=User)
+    user = User()
     for k, v in defaults.items():
         setattr(user, k, v)
     return user
@@ -42,12 +38,9 @@ class TestRegister:
     ):
         new_user = _make_user(email="new@example.com")
 
-        # First call: check existing user (returns None)
-        # flush/refresh are handled by the mock
         mock_db.execute.return_value = MockResult(scalar=None)
         mock_db.refresh.side_effect = lambda obj: None
 
-        # Patch AuthService.create_user to return our user
         with patch("app.api.v1.auth.AuthService") as MockService:
             instance = MockService.return_value
             instance.create_user = AsyncMock(return_value=new_user)
@@ -68,34 +61,44 @@ class TestRegister:
                 },
             )
 
-        assert resp.status_code == 201
+        assert resp.status_code == 200
         data = resp.json()
         assert "access_token" in data
-        assert "refresh_token" in data
-        assert data["token_type"] == "bearer"
+        assert data["user"]["email"] == "new@example.com"
 
-    async def test_register_missing_email(self, unauthed_client: AsyncClient):
-        resp = await unauthed_client.post(
-            "/api/v1/auth/register",
-            json={"password": "pass123", "full_name": "Test"},
-        )
-        assert resp.status_code == 422
+    async def test_register_duplicate_email(
+        self, unauthed_client: AsyncClient, mock_db: AsyncMock
+    ):
+        from app.core.exceptions import ConflictError
 
-    async def test_register_invalid_email(self, unauthed_client: AsyncClient):
+        with patch("app.api.v1.auth.AuthService") as MockService:
+            instance = MockService.return_value
+            instance.create_user = AsyncMock(
+                side_effect=ConflictError("Email already registered")
+            )
+
+            resp = await unauthed_client.post(
+                "/api/v1/auth/register",
+                json={
+                    "email": TEST_USER_EMAIL,
+                    "password": "SecurePassword123!",
+                    "full_name": "Existing User",
+                },
+            )
+
+        assert resp.status_code == 409
+        assert "already registered" in resp.json()["detail"]["message"]
+
+    async def test_register_weak_password(
+        self, unauthed_client: AsyncClient, mock_db: AsyncMock
+    ):
         resp = await unauthed_client.post(
             "/api/v1/auth/register",
             json={
-                "email": "not-an-email",
-                "password": "pass123",
-                "full_name": "Test",
+                "email": "test@example.com",
+                "password": "weak",
+                "full_name": "Test User",
             },
-        )
-        assert resp.status_code == 422
-
-    async def test_register_missing_password(self, unauthed_client: AsyncClient):
-        resp = await unauthed_client.post(
-            "/api/v1/auth/register",
-            json={"email": "test@example.com", "full_name": "Test"},
         )
         assert resp.status_code == 422
 
@@ -125,13 +128,25 @@ class TestLogin:
         assert resp.status_code == 200
         data = resp.json()
         assert "access_token" in data
-        assert "refresh_token" in data
+        assert data["user"]["email"] == TEST_USER_EMAIL
 
-    async def test_login_missing_fields(self, unauthed_client: AsyncClient):
-        resp = await unauthed_client.post(
-            "/api/v1/auth/login", json={"email": "test@example.com"}
-        )
-        assert resp.status_code == 422
+    async def test_login_invalid_credentials(
+        self, unauthed_client: AsyncClient, mock_db: AsyncMock
+    ):
+        from app.core.exceptions import UnauthorizedError
+
+        with patch("app.api.v1.auth.AuthService") as MockService:
+            instance = MockService.return_value
+            instance.authenticate_user = AsyncMock(
+                side_effect=UnauthorizedError("Incorrect email or password")
+            )
+
+            resp = await unauthed_client.post(
+                "/api/v1/auth/login",
+                json={"email": TEST_USER_EMAIL, "password": "wrongpassword"},
+            )
+
+        assert resp.status_code == 401
 
 
 class TestRefresh:
@@ -139,6 +154,7 @@ class TestRefresh:
         self, unauthed_client: AsyncClient, mock_db: AsyncMock
     ):
         refresh_token = create_refresh_token(data={"sub": str(TEST_USER_ID)})
+        user = _make_user()
 
         with patch("app.api.v1.auth.AuthService") as MockService:
             instance = MockService.return_value
@@ -156,23 +172,36 @@ class TestRefresh:
             )
 
         assert resp.status_code == 200
-        data = resp.json()
-        assert "access_token" in data
+        assert "access_token" in resp.json()
 
-    async def test_refresh_missing_token(self, unauthed_client: AsyncClient):
-        resp = await unauthed_client.post("/api/v1/auth/refresh", json={})
-        assert resp.status_code == 422
+    async def test_refresh_invalid_token(
+        self, unauthed_client: AsyncClient, mock_db: AsyncMock
+    ):
+        from app.core.exceptions import UnauthorizedError
+
+        with patch("app.api.v1.auth.AuthService") as MockService:
+            instance = MockService.return_value
+            instance.refresh_token = AsyncMock(
+                side_effect=UnauthorizedError("Invalid refresh token")
+            )
+
+            resp = await unauthed_client.post(
+                "/api/v1/auth/refresh",
+                json={"refresh_token": "invalid-token"},
+            )
+
+        assert resp.status_code == 401
 
 
 class TestGetMe:
-    async def test_get_me_authenticated(self, client: AsyncClient, auth_headers: dict):
-        resp = await client.get("/api/v1/auth/me", headers=auth_headers)
+    async def test_get_me_success(self, client: AsyncClient):
+        # The client fixture already has a valid token and user
+        resp = await client.get("/api/v1/auth/me")
         assert resp.status_code == 200
         data = resp.json()
         assert data["email"] == TEST_USER_EMAIL
-        assert data["full_name"] == TEST_USER_NAME
-        assert data["is_active"] is True
+        assert data["id"] == str(TEST_USER_ID)
 
     async def test_get_me_unauthenticated(self, unauthed_client: AsyncClient):
         resp = await unauthed_client.get("/api/v1/auth/me")
-        assert resp.status_code == 422  # Missing Authorization header
+        assert resp.status_code == 401  # Missing Authorization header

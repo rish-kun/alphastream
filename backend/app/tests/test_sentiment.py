@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.tests.conftest import MockResult
@@ -104,8 +102,7 @@ class TestSentimentReanalysis:
 
             resp = await client.post(
                 "/api/v1/sentiment/reanalyze",
-                json={"article_ids": [str(article_id)],
-                      "force_reanalyze": True},
+                json={"article_ids": [str(article_id)], "force_reanalyze": True},
             )
 
         assert resp.status_code == 202
@@ -123,8 +120,7 @@ class TestSentimentReanalysis:
         with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task:
             resp = await client.post(
                 "/api/v1/sentiment/reanalyze",
-                json={"article_ids": [str(article_id)],
-                      "force_reanalyze": True},
+                json={"article_ids": [str(article_id)], "force_reanalyze": True},
             )
 
         assert resp.status_code == 202

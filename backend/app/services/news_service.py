@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
 from app.models.news import ArticleStockMention, NewsArticle
-from app.models.sentiment import SentimentAnalysis
 from app.models.stock import Stock
 from app.schemas.news import NewsArticleResponse, NewsFeedQuery, NewsListResponse
 
@@ -19,7 +18,7 @@ class NewsService:
     async def get_news_feed(self, query: NewsFeedQuery) -> NewsListResponse:
         """Get paginated news feed with optional filters."""
         from sqlalchemy.orm import selectinload
-        
+
         base_stmt = select(NewsArticle).options(
             selectinload(NewsArticle.sentiment_analyses),
             selectinload(NewsArticle.mentions).selectinload(ArticleStockMention.stock),
@@ -111,12 +110,14 @@ class NewsService:
     async def get_trending_news(self, limit: int = 10) -> list[NewsArticleResponse]:
         """Get trending news articles (most recent, with or without sentiment analyses)."""
         from sqlalchemy.orm import selectinload
-        
+
         stmt = (
             select(NewsArticle)
             .options(
                 selectinload(NewsArticle.sentiment_analyses),
-                selectinload(NewsArticle.mentions).selectinload(ArticleStockMention.stock),
+                selectinload(NewsArticle.mentions).selectinload(
+                    ArticleStockMention.stock
+                ),
             )
             .order_by(NewsArticle.published_at.desc())
             .limit(limit)
@@ -129,12 +130,14 @@ class NewsService:
     async def get_article(self, article_id: uuid.UUID) -> NewsArticleResponse:
         """Get a specific news article by ID."""
         from sqlalchemy.orm import selectinload
-        
+
         stmt = (
             select(NewsArticle)
             .options(
                 selectinload(NewsArticle.sentiment_analyses),
-                selectinload(NewsArticle.mentions).selectinload(ArticleStockMention.stock),
+                selectinload(NewsArticle.mentions).selectinload(
+                    ArticleStockMention.stock
+                ),
             )
             .where(NewsArticle.id == article_id)
         )
