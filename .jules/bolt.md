@@ -1,0 +1,3 @@
+## 2026-04-21 - Push Deduplication to DB using DISTINCT ON
+**Learning:** In PostgreSQL architectures like this backend, utilizing `.distinct(*columns)` alongside `.order_by()` translates into a highly efficient `DISTINCT ON` SQL pattern. This deduplicates items locally in the DB according to sorting precedence, significantly saving application memory by preventing hundreds or thousands of rows from unnecessarily traversing the network just to be manually reduced via a Python set or dictionary.
+**Action:** When filtering groups down to the 'latest' element per entity category (like window intervals or stock IDs), favor applying `.distinct(category)` at the SQLAlchemy Query builder stage instead of Python-side iterating or `.unique()` checks if PostgreSQL is in use.
