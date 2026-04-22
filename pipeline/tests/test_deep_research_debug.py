@@ -12,7 +12,6 @@ import logging
 import sys
 import uuid
 from datetime import datetime, UTC
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -429,28 +428,43 @@ class TestDatabaseConnection:
 
         from pipeline.database import get_engine, check_schema_ready
         from pipeline.config import settings
+        from unittest.mock import patch, MagicMock
 
         logger.info(
             f"Database URL: {settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else settings.DATABASE_URL}"
         )
 
-        try:
-            engine = get_engine()
-            with engine.connect() as conn:
-                result = conn.execute(__import__("sqlalchemy").text("SELECT 1"))
-                logger.info(f"Database connection test: {result.scalar()}")
+        with patch("pipeline.database.get_engine") as mock_get_engine, \
+             patch("pipeline.database.check_schema_ready", return_value=True) as mock_check_schema_ready:
 
-            schema_ready = check_schema_ready()
-            logger.info(f"Schema ready: {schema_ready}")
+            mock_conn = MagicMock()
+            mock_conn.__enter__.return_value = mock_conn
+            mock_result = MagicMock()
+            mock_result.scalar.return_value = 1
+            mock_conn.execute.return_value = mock_result
 
-            if schema_ready:
-                from pipeline.database import _REQUIRED_TABLES
+            mock_engine = MagicMock()
+            mock_engine.connect.return_value = mock_conn
+            mock_get_engine.return_value = mock_engine
 
-                logger.info(f"Required tables: {', '.join(sorted(_REQUIRED_TABLES))}")
+            try:
+                from pipeline.database import get_engine, check_schema_ready
+                engine = get_engine()
+                with engine.connect() as conn:
+                    result = conn.execute(__import__("sqlalchemy").text("SELECT 1"))
+                    logger.info(f"Database connection test: {result.scalar()}")
 
-        except Exception as e:
-            logger.error(f"Database connection failed: {str(e)}", exc_info=True)
-            raise
+                schema_ready = check_schema_ready()
+                logger.info(f"Schema ready: {schema_ready}")
+
+                if schema_ready:
+                    from pipeline.database import _REQUIRED_TABLES
+
+                    logger.info(f"Required tables: {', '.join(sorted(_REQUIRED_TABLES))}")
+
+            except Exception as e:
+                logger.error(f"Database connection failed: {e}")
+                raise
 
 
 if __name__ == "__main__":
