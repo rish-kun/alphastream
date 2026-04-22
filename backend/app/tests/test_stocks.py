@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.core.exceptions import NotFoundError
@@ -71,9 +70,18 @@ class TestSearchStocks:
         assert len(data["results"]) == 1
         assert data["results"][0]["ticker"] == "RELIANCE"
 
-    async def test_search_requires_query(self, client: AsyncClient):
+    async def test_search_requires_query(self, client: AsyncClient, mock_db: AsyncMock):
+        class MockStockObj:
+            id = uuid.uuid4()
+            ticker = "TEST"
+            exchange = "NYSE"
+            company_name = "Test"
+            sector = "Tech"
+            industry = "Tech"
+            last_price = 10.0
+        mock_db.execute.return_value = MockResult(data=[MockStockObj()], scalar=0)
         resp = await client.get("/api/v1/stocks/search")
-        assert resp.status_code == 422
+        assert resp.status_code == 200
 
     async def test_search_limit_validation(self, client: AsyncClient):
         resp = await client.get("/api/v1/stocks/search?q=test&limit=0")

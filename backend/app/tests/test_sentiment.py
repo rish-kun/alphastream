@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.tests.conftest import MockResult
@@ -78,7 +76,7 @@ class TestSectorSentiment:
         # Second call: top stocks query for that sector
         mock_db.execute.side_effect = [
             MockResult(data=[sector_row]),  # sector query
-            MockResult(data=[("HDFCBANK",), ("ICICIBANK",)]),  # top stocks
+            MockResult(data=[("Banking & Finance", "HDFCBANK",), ("Banking & Finance", "ICICIBANK",)]),  # top stocks
         ]
 
         resp = await client.get("/api/v1/sentiment/sectors")
@@ -99,7 +97,7 @@ class TestSentimentReanalysis:
         article_id = uuid.uuid4()
         mock_db.execute.return_value = MockResult(data=[article_id])
 
-        with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task:
+        with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task, patch("app.api.v1.sentiment.reanalysis_status_service.start_reanalysis", new_callable=AsyncMock) as mock_start_reanalysis:
             mock_send_task.return_value = MagicMock(id="task-123")
 
             resp = await client.post(

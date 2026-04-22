@@ -1,0 +1,3 @@
+## 2025-05-18 - Replacing Database N+1 Iteration with Window Functions
+**Learning:** In PostgreSQL-backed applications like this one, it's common to accidentally fall into N+1 iteration traps when needing "Top N per Group" (e.g., getting the top 5 stocks per sector). Iterating sectors in Python and querying the database for each sector is extremely slow due to the network and query parsing overhead.
+**Action:** Use a combination of `DISTINCT ON` (mapped via `.distinct(*columns)`) for deduplication and a window function like `func.row_number().over(partition_by=group, order_by=rank)` as a CTE/Subquery to push the entire grouping and limiting logic into a single database query.
