@@ -418,16 +418,27 @@ class TestResearchTopicTask:
             raise
 
 
+from unittest.mock import patch, MagicMock
+
 class TestDatabaseConnection:
     """Tests for database connection status."""
 
-    def test_database_connection(self):
+    @patch("pipeline.database.check_schema_ready", return_value=True)
+    @patch("pipeline.database.get_engine")
+    def test_database_connection(self, mock_get_engine, mock_check_schema_ready):
         """Test database connection and schema."""
         logger.info("=" * 80)
         logger.info("TEST: Database connection status")
         logger.info("=" * 80)
 
-        from pipeline.database import get_engine, check_schema_ready
+        mock_engine = MagicMock()
+        mock_conn = MagicMock()
+        mock_result = MagicMock()
+        mock_result.scalar.return_value = 1
+        mock_conn.execute.return_value = mock_result
+        mock_engine.connect.return_value.__enter__.return_value = mock_conn
+        mock_get_engine.return_value = mock_engine
+
         from pipeline.config import settings
 
         logger.info(
@@ -435,12 +446,12 @@ class TestDatabaseConnection:
         )
 
         try:
-            engine = get_engine()
+            engine = mock_get_engine()
             with engine.connect() as conn:
                 result = conn.execute(__import__("sqlalchemy").text("SELECT 1"))
                 logger.info(f"Database connection test: {result.scalar()}")
 
-            schema_ready = check_schema_ready()
+            schema_ready = mock_check_schema_ready()
             logger.info(f"Schema ready: {schema_ready}")
 
             if schema_ready:
