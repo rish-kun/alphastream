@@ -3,6 +3,7 @@
 import json
 import logging
 from math import ceil
+from datetime import datetime, timezone
 from typing import Any
 
 from celery import Task
@@ -477,7 +478,6 @@ def analyze_article(self: Task, article_id: str, force_reanalyze: bool = False) 
             "Failed to save sentiment analysis for %s: %s", article_id, exc)
         # Update reanalysis status
         try:
-            import asyncio
             asyncio.run(_update_reanalysis_status(
                 article_id,
                 "failed",
