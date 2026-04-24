@@ -1,0 +1,3 @@
+## 2024-05-24 - Database-Level Deduplication
+**Learning:** The backend application relies on PostgreSQL, allowing the safe use of PostgreSQL-specific SQLAlchemy features such as `.distinct(*columns)` combined with `.order_by()` (which translates to `DISTINCT ON`) for query-level deduplication to fetch the latest record per group efficiently. This avoids the severe performance and memory overhead of fetching all records into Python and deduplicating in-memory.
+**Action:** Always prefer `DISTINCT ON` via SQLAlchemy `.distinct(*columns)` when needing to deduplicate or fetch the "latest N per group" in PostgreSQL.
