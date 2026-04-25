@@ -6,7 +6,6 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.core.exceptions import NotFoundError
@@ -109,7 +108,10 @@ class TestGetNewsFeed:
         assert resp.status_code == 422
 
     async def test_invalid_page_size(self, client: AsyncClient):
-        resp = await client.get("/api/v1/news/?page_size=100")
+        # 100 is valid (le=1000). To trigger 422, we need page_size to be invalid based on Pydantic constraints, or we mock the db call.
+        # Actually, in router.py: page_size: Annotated[int, Query(ge=1, le=1000)] = 20
+        # So 10000 will be invalid and trigger 422 without hitting the service.
+        resp = await client.get("/api/v1/news/?page_size=10000")
         assert resp.status_code == 422
 
 

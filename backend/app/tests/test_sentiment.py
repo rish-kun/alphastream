@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from app.tests.conftest import MockResult
@@ -93,8 +91,9 @@ class TestSectorSentiment:
 
 
 class TestSentimentReanalysis:
+    @patch("app.api.v1.sentiment.reanalysis_status_service.start_reanalysis", new_callable=AsyncMock)
     async def test_reanalyze_dispatches_existing_articles(
-        self, client: AsyncClient, mock_db: AsyncMock
+        self, mock_start_reanalysis: AsyncMock, client: AsyncClient, mock_db: AsyncMock
     ):
         article_id = uuid.uuid4()
         mock_db.execute.return_value = MockResult(data=[article_id])
@@ -113,9 +112,11 @@ class TestSentimentReanalysis:
         assert data["dispatched"] == 1
         assert data["task_ids"] == ["task-123"]
         assert data["skipped_article_ids"] == []
+        mock_start_reanalysis.assert_awaited_once()
 
+    @patch("app.api.v1.sentiment.reanalysis_status_service.start_reanalysis", new_callable=AsyncMock)
     async def test_reanalyze_skips_missing_articles(
-        self, client: AsyncClient, mock_db: AsyncMock
+        self, mock_start_reanalysis: AsyncMock, client: AsyncClient, mock_db: AsyncMock
     ):
         article_id = uuid.uuid4()
         mock_db.execute.return_value = MockResult(data=[])
