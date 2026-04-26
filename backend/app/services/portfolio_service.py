@@ -205,19 +205,20 @@ class PortfolioService:
         if not stock_ids:
             return {"portfolio_id": str(portfolio_id), "articles": []}
 
-        # Get recent news articles mentioning those stocks
+        # ⚡ Bolt Optimization:
+        # What: Replaced `.join()` + `.unique()` with an `EXISTS` subquery (`.any()`).
+        # Why: Prevents duplicating Article rows in the SQL result set, saving memory
+        #      and ensuring that the `.limit(50)` accurately limits distinct articles
+        #      before they reach Python.
+        # Impact: Reduces memory overhead and avoids returning <50 items.
         articles_stmt = (
             select(NewsArticle)
-            .join(
-                ArticleStockMention,
-                ArticleStockMention.article_id == NewsArticle.id,
-            )
-            .where(ArticleStockMention.stock_id.in_(stock_ids))
+            .where(NewsArticle.mentions.any(ArticleStockMention.stock_id.in_(stock_ids)))
             .order_by(NewsArticle.published_at.desc())
             .limit(50)
         )
         articles_result = await self.db.execute(articles_stmt)
-        articles = articles_result.scalars().unique().all()
+        articles = articles_result.scalars().all()
 
         return {
             "portfolio_id": str(portfolio_id),

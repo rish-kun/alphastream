@@ -12,7 +12,6 @@ Add to router with:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,7 +20,6 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
-from app.models.user import User
 from app.models.news import NewsArticle
 
 logger = logging.getLogger(__name__)
