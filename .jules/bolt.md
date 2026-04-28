@@ -1,0 +1,3 @@
+## 2026-03-03 - Avoid limit() with Python deduplication for relationship filtering
+**Learning:** Using `.join()` on one-to-many relationships combined with `.limit()` and Python-side `.unique()` deduplication is an anti-pattern. It generates duplicate rows, wastes bandwidth, requires full database `.distinct()` sorts, and critically, causes the limit to apply to the duplicated result set, potentially returning fewer distinct items than intended.
+**Action:** Always prefer `EXISTS` subqueries using SQLAlchemy's `.any()` or `.has()` for relationship filtering when deduplicated root objects are desired, especially before applying a `.limit()`.
