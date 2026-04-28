@@ -108,7 +108,7 @@ async def research_portfolio(
     return ResearchTaskResponse(
         task_id=task_id,
         status="dispatched",
-        message=f"Extensive research started for portfolio",
+        message="Extensive research started for portfolio",
     )
 
 

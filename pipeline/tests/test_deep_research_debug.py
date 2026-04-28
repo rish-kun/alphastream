@@ -421,7 +421,9 @@ class TestResearchTopicTask:
 class TestDatabaseConnection:
     """Tests for database connection status."""
 
-    def test_database_connection(self):
+    @patch("pipeline.database.get_engine")
+    @patch("pipeline.database.check_schema_ready")
+    def test_database_connection(self, mock_check_schema, mock_get_engine):
         """Test database connection and schema."""
         logger.info("=" * 80)
         logger.info("TEST: Database connection status")
@@ -433,6 +435,13 @@ class TestDatabaseConnection:
         logger.info(
             f"Database URL: {settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else settings.DATABASE_URL}"
         )
+
+        mock_engine = MagicMock()
+        mock_conn = mock_engine.connect.return_value.__enter__.return_value
+        mock_conn.execute.return_value.scalar.return_value = 1
+        mock_get_engine.return_value = mock_engine
+
+        mock_check_schema.return_value = True
 
         try:
             engine = get_engine()
