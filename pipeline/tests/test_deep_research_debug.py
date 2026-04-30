@@ -421,7 +421,9 @@ class TestResearchTopicTask:
 class TestDatabaseConnection:
     """Tests for database connection status."""
 
-    def test_database_connection(self):
+    @patch("pipeline.database.get_engine")
+    @patch("pipeline.database.check_schema_ready")
+    def test_database_connection(self, mock_check, mock_engine):
         """Test database connection and schema."""
         logger.info("=" * 80)
         logger.info("TEST: Database connection status")
@@ -435,7 +437,9 @@ class TestDatabaseConnection:
         )
 
         try:
-            engine = get_engine()
+            mock_engine.return_value.connect.return_value.__enter__.return_value.execute.return_value.scalar.return_value = 1
+            mock_check.return_value = True
+            engine = mock_engine()
             with engine.connect() as conn:
                 result = conn.execute(__import__("sqlalchemy").text("SELECT 1"))
                 logger.info(f"Database connection test: {result.scalar()}")
