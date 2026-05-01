@@ -1,0 +1,3 @@
+## 2026-03-03 - SQLAlchemy JOIN vs EXISTS for Many-to-Many Relationships with Limits
+**Learning:** When combining query limits (e.g. `.limit(50)`) with relationship filtering, using `.join()` followed by `.distinct()` or python-side `.unique()` generates Cartesian products and can cause the limit to be applied *before* deduplication. This leads to fewer unique items being returned than the requested limit and wastes database compute and memory.
+**Action:** Always prefer using EXISTS subqueries via `.any()` or `.has()` when filtering by a relationship but returning rows from the parent table, especially when a `.limit()` is involved.

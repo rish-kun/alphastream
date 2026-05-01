@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
 from app.models.news import ArticleStockMention, NewsArticle
-from app.models.sentiment import SentimentAnalysis
 from app.models.stock import Stock
 from app.schemas.news import NewsArticleResponse, NewsFeedQuery, NewsListResponse
 
@@ -19,7 +18,7 @@ class NewsService:
     async def get_news_feed(self, query: NewsFeedQuery) -> NewsListResponse:
         """Get paginated news feed with optional filters."""
         from sqlalchemy.orm import selectinload
-        
+
         base_stmt = select(NewsArticle).options(
             selectinload(NewsArticle.sentiment_analyses),
             selectinload(NewsArticle.mentions).selectinload(ArticleStockMention.stock),
@@ -65,23 +64,16 @@ class NewsService:
                 )
 
         if query.ticker:
-            # Join through article_stock_mentions to filter by ticker
-            base_stmt = base_stmt.join(
-                ArticleStockMention,
-                ArticleStockMention.article_id == NewsArticle.id,
-            ).join(
-                Stock,
-                Stock.id == ArticleStockMention.stock_id,
+            # Use EXISTS subquery via .any() and .has() instead of JOIN + DISTINCT
+            # This avoids generating a Cartesian product, improving DB performance
+            # and ensuring the limit applies correctly.
+            conditions.append(
+                NewsArticle.mentions.any(
+                    ArticleStockMention.stock.has(
+                        func.lower(Stock.ticker) == func.lower(query.ticker)
+                    )
+                )
             )
-            count_stmt = count_stmt.join(
-                ArticleStockMention,
-                ArticleStockMention.article_id == NewsArticle.id,
-            ).join(
-                Stock,
-                Stock.id == ArticleStockMention.stock_id,
-            )
-            conditions.append(func.lower(Stock.ticker) == func.lower(query.ticker))
-            base_stmt = base_stmt.distinct()
 
         if conditions:
             base_stmt = base_stmt.where(and_(*conditions))
@@ -111,12 +103,14 @@ class NewsService:
     async def get_trending_news(self, limit: int = 10) -> list[NewsArticleResponse]:
         """Get trending news articles (most recent, with or without sentiment analyses)."""
         from sqlalchemy.orm import selectinload
-        
+
         stmt = (
             select(NewsArticle)
             .options(
                 selectinload(NewsArticle.sentiment_analyses),
-                selectinload(NewsArticle.mentions).selectinload(ArticleStockMention.stock),
+                selectinload(NewsArticle.mentions).selectinload(
+                    ArticleStockMention.stock
+                ),
             )
             .order_by(NewsArticle.published_at.desc())
             .limit(limit)
@@ -129,12 +123,14 @@ class NewsService:
     async def get_article(self, article_id: uuid.UUID) -> NewsArticleResponse:
         """Get a specific news article by ID."""
         from sqlalchemy.orm import selectinload
-        
+
         stmt = (
             select(NewsArticle)
             .options(
                 selectinload(NewsArticle.sentiment_analyses),
-                selectinload(NewsArticle.mentions).selectinload(ArticleStockMention.stock),
+                selectinload(NewsArticle.mentions).selectinload(
+                    ArticleStockMention.stock
+                ),
             )
             .where(NewsArticle.id == article_id)
         )
