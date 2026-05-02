@@ -56,6 +56,7 @@ class TestRegister:
                     access_token="access-token",
                     refresh_token="refresh-token",
                     token_type="bearer",
+                    user=new_user,
                 )
             )
 
@@ -114,6 +115,7 @@ class TestLogin:
                     access_token="access-token",
                     refresh_token="refresh-token",
                     token_type="bearer",
+                    user=user,
                 )
             )
 
@@ -138,6 +140,7 @@ class TestRefresh:
     async def test_refresh_success(
         self, unauthed_client: AsyncClient, mock_db: AsyncMock
     ):
+        user = _make_user()
         refresh_token = create_refresh_token(data={"sub": str(TEST_USER_ID)})
 
         with patch("app.api.v1.auth.AuthService") as MockService:
@@ -147,6 +150,7 @@ class TestRefresh:
                     access_token="new-access-token",
                     refresh_token="new-refresh-token",
                     token_type="bearer",
+                    user=user,
                 )
             )
 
@@ -175,4 +179,4 @@ class TestGetMe:
 
     async def test_get_me_unauthenticated(self, unauthed_client: AsyncClient):
         resp = await unauthed_client.get("/api/v1/auth/me")
-        assert resp.status_code == 422  # Missing Authorization header
+        assert resp.status_code == 401  # Missing Authorization header
