@@ -15,16 +15,10 @@ from app.tests.conftest import MockResult
 class TestSentimentOverview:
     async def test_returns_overview(self, client: AsyncClient, mock_db: AsyncMock):
         # Mock the sequence of DB calls in the sentiment overview endpoint:
-        # 1. avg sentiment -> 0.35
-        # 2. bullish count -> 10
-        # 3. bearish count -> 5
-        # 4. neutral count -> 15
-        # 5. top movers -> empty list
+        # 1. combined query (avg, bullish, bearish, neutral) -> (0.35, 10, 5, 15)
+        # 2. top movers -> empty list
         mock_db.execute.side_effect = [
-            MockResult(scalar=0.35),  # avg sentiment
-            MockResult(scalar=10),  # bullish
-            MockResult(scalar=5),  # bearish
-            MockResult(scalar=15),  # neutral
+            MockResult(data=[(0.35, 10, 5, 15)]),  # combined query result
             MockResult(data=[]),  # top movers
         ]
 
@@ -43,10 +37,7 @@ class TestSentimentOverview:
     ):
         # When no analyses exist, avg returns None -> should default to 0.0
         mock_db.execute.side_effect = [
-            MockResult(scalar=None),  # avg sentiment (no data)
-            MockResult(scalar=0),  # bullish
-            MockResult(scalar=0),  # bearish
-            MockResult(scalar=0),  # neutral
+            MockResult(data=[(None, 0, 0, 0)]),  # combined query result (no data)
             MockResult(data=[]),  # top movers
         ]
 
