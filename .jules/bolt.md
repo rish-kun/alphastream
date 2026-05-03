@@ -1,0 +1,3 @@
+## 2026-03-03 - Database Aggregate Optimization
+**Learning:** This codebase had an instance where multiple queries were used to fetch different aggregate counts (bullish, bearish, neutral) over the exact same dataset. This resulted in 4 separate network roundtrips to the DB. SQLAlchemy test mocks (`MockResult`) needed a `.first()` method added to correctly support mocking these single-row multi-column return structures.
+**Action:** Use conditional aggregation (`func.count(case(...))`) to combine multiple similar `COUNT` queries into a single query to reduce database load and latency. When adding `.first()` support to SQLAlchemy mocks, ensure it safely handles empty data lists.
