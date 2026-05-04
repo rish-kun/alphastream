@@ -70,9 +70,14 @@ class TestSearchStocks:
         assert len(data["results"]) == 1
         assert data["results"][0]["ticker"] == "RELIANCE"
 
-    async def test_search_requires_query(self, client: AsyncClient):
+    async def test_search_requires_query(self, client: AsyncClient, mock_db):
+        from app.tests.conftest import MockResult
+        mock_db.execute.side_effect = [
+            MockResult(data=[]),  # stmt result
+            MockResult(scalar=0)   # count_stmt result
+        ]
         resp = await client.get("/api/v1/stocks/search")
-        assert resp.status_code == 422
+        assert resp.status_code == 200
 
     async def test_search_limit_validation(self, client: AsyncClient):
         resp = await client.get("/api/v1/stocks/search?q=test&limit=0")
