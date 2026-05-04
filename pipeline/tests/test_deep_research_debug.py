@@ -418,10 +418,14 @@ class TestResearchTopicTask:
             raise
 
 
+from unittest.mock import patch
+
 class TestDatabaseConnection:
     """Tests for database connection status."""
 
-    def test_database_connection(self):
+    @patch("pipeline.database.get_engine")
+    @patch("pipeline.database.check_schema_ready")
+    def test_database_connection(self, mock_check_schema, mock_get_engine):
         """Test database connection and schema."""
         logger.info("=" * 80)
         logger.info("TEST: Database connection status")
