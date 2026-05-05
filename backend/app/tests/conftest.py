@@ -177,6 +177,11 @@ class MockResult:
             return 0
         return self._scalar
 
+    def first(self):
+        if self._data:
+            return self._data[0]
+        return None
+
 
 @pytest.fixture
 def mock_result():
