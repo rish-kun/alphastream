@@ -18,8 +18,8 @@ sys.path.insert(0, str(project_root))
 # Add pipeline to path
 sys.path.insert(0, str(project_root / "pipeline"))
 
-from sqlalchemy import text
-from pipeline.database import get_db, check_schema_ready
+from sqlalchemy import text  # noqa: E402
+from pipeline.database import get_db, check_schema_ready  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
