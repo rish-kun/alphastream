@@ -169,6 +169,11 @@ class MockResult:
     def unique(self):
         return self
 
+    def first(self):
+        if self._data:
+            return self._data[0]
+        return None
+
     def scalar_one_or_none(self):
         return self._scalar
 
