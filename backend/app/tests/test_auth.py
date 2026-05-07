@@ -45,15 +45,25 @@ class TestRegister:
         mock_db.execute.return_value = MockResult(scalar=None)
         mock_db.refresh.side_effect = lambda obj: None
 
+        from app.schemas.user import TokenResponse, UserResponse
+
         # Patch AuthService.create_user to return our user
         with patch("app.api.v1.auth.AuthService") as MockService:
             instance = MockService.return_value
             instance.create_user = AsyncMock(return_value=new_user)
             instance.create_tokens = AsyncMock(
-                return_value=MagicMock(
+                return_value=TokenResponse(
                     access_token="access-token",
                     refresh_token="refresh-token",
                     token_type="bearer",
+                    user=UserResponse(
+                        id=new_user.id,
+                        email=new_user.email,
+                        full_name=new_user.full_name,
+                        oauth_provider=new_user.oauth_provider,
+                        is_active=new_user.is_active,
+                        created_at=new_user.created_at,
+                    ),
                 )
             )
 
@@ -102,16 +112,25 @@ class TestLogin:
     async def test_login_success(
         self, unauthed_client: AsyncClient, mock_db: AsyncMock
     ):
+        from app.schemas.user import TokenResponse, UserResponse
         user = _make_user()
 
         with patch("app.api.v1.auth.AuthService") as MockService:
             instance = MockService.return_value
             instance.authenticate_user = AsyncMock(return_value=user)
             instance.create_tokens = AsyncMock(
-                return_value=MagicMock(
+                return_value=TokenResponse(
                     access_token="access-token",
                     refresh_token="refresh-token",
                     token_type="bearer",
+                    user=UserResponse(
+                        id=user.id,
+                        email=user.email,
+                        full_name=user.full_name,
+                        oauth_provider=user.oauth_provider,
+                        is_active=user.is_active,
+                        created_at=user.created_at,
+                    ),
                 )
             )
 
@@ -136,15 +155,25 @@ class TestRefresh:
     async def test_refresh_success(
         self, unauthed_client: AsyncClient, mock_db: AsyncMock
     ):
+        from app.schemas.user import TokenResponse, UserResponse
+        user = _make_user()
         refresh_token = create_refresh_token(data={"sub": str(TEST_USER_ID)})
 
         with patch("app.api.v1.auth.AuthService") as MockService:
             instance = MockService.return_value
             instance.refresh_token = AsyncMock(
-                return_value=MagicMock(
+                return_value=TokenResponse(
                     access_token="new-access-token",
                     refresh_token="new-refresh-token",
                     token_type="bearer",
+                    user=UserResponse(
+                        id=user.id,
+                        email=user.email,
+                        full_name=user.full_name,
+                        oauth_provider=user.oauth_provider,
+                        is_active=user.is_active,
+                        created_at=user.created_at,
+                    ),
                 )
             )
 
@@ -173,4 +202,4 @@ class TestGetMe:
 
     async def test_get_me_unauthenticated(self, unauthed_client: AsyncClient):
         resp = await unauthed_client.get("/api/v1/auth/me")
-        assert resp.status_code == 422  # Missing Authorization header
+        assert resp.status_code == 401  # Missing Authorization header
