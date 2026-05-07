@@ -1,0 +1,3 @@
+## 2025-05-07 - Optimize multiple SQLAlchemy count and average queries into a single query
+**Learning:** In SQLAlchemy, multiple aggregate queries over the same dataset (such as separate count queries for different conditions and an average) can be optimized into a single database query. Using conditional aggregation with `func.count(case((condition, 1)))` and `func.avg` significantly reduces database round-trips and improves backend performance.
+**Action:** When gathering multiple statistics over the same filtered dataset, use a single query with `case` statements for conditional counting or summing rather than executing multiple sequential queries.
