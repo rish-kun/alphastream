@@ -1,5 +1,0 @@
-Optimize market sentiment endpoint by aggregating queries
-
-* Refactored `get_market_sentiment` to use a single conditional aggregation query instead of 4 separate sequential database queries.
-* Updated `MockResult` in tests with `.first()` and updated `test_sentiment.py` to reflect the new aggregated format.
-* Fixed various CI issues including lint errors, missing `.all()` issues on `mock_db` returns in `test_stocks.py` and `test_news.py`, and Pydantic validation errors in `test_auth.py` by making mocks return properly structured Pydantic models.

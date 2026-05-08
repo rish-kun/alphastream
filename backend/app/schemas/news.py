@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from app.schemas.sentiment import SentimentResponse
+    from app.schemas.sentiment import SentimentResponse  # noqa: E402
 
 
 class NewsMention(BaseModel):
@@ -64,6 +64,6 @@ class NewsFeedQuery(BaseModel):
     to_date: datetime | None = None
 
 
-from app.schemas.sentiment import SentimentResponse
+from app.schemas.sentiment import SentimentResponse  # noqa: E402
 
 NewsArticleResponse.model_rebuild()
