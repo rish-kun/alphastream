@@ -8,7 +8,7 @@ automatically.
 
 import logging
 import uuid
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, UTC
 
 from celery import Task
 from sqlalchemy import text
