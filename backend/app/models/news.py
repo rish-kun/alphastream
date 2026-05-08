@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 import uuid
 from datetime import datetime
 
@@ -8,6 +9,13 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.sentiment import SentimentAnalysis
+    from app.models.stock import Stock
+
 
 
 class NewsArticle(Base):
@@ -33,10 +41,10 @@ class NewsArticle(Base):
     category: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Relationships
-    mentions: Mapped[list["ArticleStockMention"]] = relationship(
+    mentions: Mapped[list[ArticleStockMention]] = relationship(
         "ArticleStockMention", back_populates="article", lazy="selectin"
     )
-    sentiment_analyses: Mapped[list["SentimentAnalysis"]] = relationship(
+    sentiment_analyses: Mapped[list[SentimentAnalysis]] = relationship(
         "SentimentAnalysis", backref="article", lazy="selectin"
     )
 
@@ -67,6 +75,6 @@ class ArticleStockMention(Base):
     article: Mapped["NewsArticle"] = relationship(
         "NewsArticle", back_populates="mentions", lazy="selectin"
     )
-    stock: Mapped["Stock"] = relationship(
+    stock: Mapped[Stock] = relationship(
         "Stock", back_populates="mentions", lazy="selectin"
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 import uuid
 from datetime import datetime
 
@@ -8,6 +9,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.stock import Stock
+
 
 
 class Portfolio(Base):
@@ -29,7 +36,7 @@ class Portfolio(Base):
     )
 
     # Relationships
-    stocks: Mapped[list["PortfolioStock"]] = relationship(
+    stocks: Mapped[list[PortfolioStock]] = relationship(
         "PortfolioStock",
         back_populates="portfolio",
         lazy="selectin",
@@ -65,6 +72,6 @@ class PortfolioStock(Base):
     portfolio: Mapped["Portfolio"] = relationship(
         "Portfolio", back_populates="stocks", lazy="selectin"
     )
-    stock: Mapped["Stock"] = relationship(
+    stock: Mapped[Stock] = relationship(
         "Stock", back_populates="portfolio_stocks", lazy="selectin"
     )

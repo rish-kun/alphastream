@@ -4,10 +4,10 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from app.schemas.sentiment import SentimentResponse
+    from app.schemas.sentiment import SentimentResponse  # noqa: E402
 
 
 class NewsMention(BaseModel):
@@ -54,8 +54,8 @@ class NewsListResponse(BaseModel):
 
 
 class NewsFeedQuery(BaseModel):
-    page: int = 1
-    page_size: int = 20
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=20, ge=1, le=50)
     source: str | None = None
     category: str | None = None
     ticker: str | None = None
@@ -64,6 +64,6 @@ class NewsFeedQuery(BaseModel):
     to_date: datetime | None = None
 
 
-from app.schemas.sentiment import SentimentResponse
+from app.schemas.sentiment import SentimentResponse  # noqa: E402
 
 NewsArticleResponse.model_rebuild()
