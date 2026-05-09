@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from app.schemas.sentiment import SentimentResponse
@@ -54,8 +54,8 @@ class NewsListResponse(BaseModel):
 
 
 class NewsFeedQuery(BaseModel):
-    page: int = 1
-    page_size: int = 20
+    page: int = Field(1, ge=1)
+    page_size: int = Field(20, ge=1, le=50)
     source: str | None = None
     category: str | None = None
     ticker: str | None = None

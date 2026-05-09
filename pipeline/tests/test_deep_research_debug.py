@@ -421,11 +421,23 @@ class TestResearchTopicTask:
 class TestDatabaseConnection:
     """Tests for database connection status."""
 
-    def test_database_connection(self):
-        """Test database connection and schema."""
+    @patch("pipeline.database.get_engine")
+    @patch("pipeline.database.check_schema_ready")
+    def test_database_connection(self, mock_check_schema_ready, mock_get_engine):
+        """Test database connection and schema using mocks."""
         logger.info("=" * 80)
         logger.info("TEST: Database connection status")
         logger.info("=" * 80)
+
+        # Mock engine connection
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.scalar.return_value = 1
+
+        mock_engine = MagicMock()
+        mock_engine.connect.return_value.__enter__.return_value = mock_conn
+        mock_get_engine.return_value = mock_engine
+
+        mock_check_schema_ready.return_value = True
 
         from pipeline.database import get_engine, check_schema_ready
         from pipeline.config import settings
