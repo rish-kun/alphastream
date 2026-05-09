@@ -1,0 +1,3 @@
+## 2026-03-03 - [Optimize Sentiment Conditional Aggregation]
+**Learning:** In SQLAlchemy, multiple aggregate queries over the same dataset (such as separate count queries for bullish, bearish, and neutral conditions) can be optimized into a single database query using conditional aggregation with `func.count(case((condition, 1)))`. This significantly reduces database round-trips and eliminates N+1 query overhead for endpoint summarizations.
+**Action:** Always verify if multiple `select(func.count())` statements against the same table/filters can be coalesced into a single query using conditional case statements, and ensure test mock results (`MockResult`) provide a `first()` or similar method to handle tuples containing the aggregated results.

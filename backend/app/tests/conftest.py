@@ -166,6 +166,9 @@ class MockResult:
     def all(self):
         return self._data
 
+    def first(self):
+        return self._data[0] if self._data else None
+
     def unique(self):
         return self
 
