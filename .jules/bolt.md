@@ -1,0 +1,3 @@
+## 2026-03-03 - [Optimize Market Sentiment DB queries using conditional aggregation]
+**Learning:** Found an instance where 4 sequential database queries were being executed to calculate average sentiment and respective bullish/bearish/neutral counts, leading to N+1 equivalent scaling overhead.
+**Action:** Combined multiple scalar queries on the same table into a single scan using conditional aggregation with `func.count(case(...))`, which reduces database round-trips and improves overall endpoint performance. Tests mocking the DB execution using `MockResult` required the addition of a `first()` method and the `mock_db.execute.side_effect` needed updates to return the unified single tuple of responses.
