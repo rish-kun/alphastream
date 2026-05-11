@@ -166,6 +166,13 @@ class MockResult:
     def all(self):
         return self._data
 
+    def first(self):
+        if self._data:
+            return self._data[0]
+        if self._scalar is not None:
+            return (self._scalar,)
+        return None
+
     def unique(self):
         return self
 

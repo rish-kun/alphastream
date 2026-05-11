@@ -7,7 +7,7 @@ from typing import Annotated
 from celery import Celery
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -85,53 +85,27 @@ async def get_market_sentiment(
     now = datetime.now(timezone.utc)
     since = now - timedelta(hours=24)
 
-    # Get average sentiment from recent analyses (last 24h)
-    avg_stmt = select(func.avg(SentimentAnalysis.sentiment_score)).where(
-        SentimentAnalysis.analyzed_at >= since
-    )
-    avg_result = await db.execute(avg_stmt)
-    market_sentiment = avg_result.scalar_one() or 0.0
+    # ⚡ Bolt: Single pass aggregation for all metrics
+    # Get avg sentiment and distinct sentiment counts (bullish, bearish, neutral) in a single database query.
+    # This reduces 4 database round-trips to 1.
+    agg_stmt = select(
+        func.avg(SentimentAnalysis.sentiment_score).label("avg_sentiment"),
+        func.count(case((SentimentAnalysis.sentiment_score > 0.3, 1))).label("bullish_count"),
+        func.count(case((SentimentAnalysis.sentiment_score < -0.3, 1))).label("bearish_count"),
+        func.count(case((and_(SentimentAnalysis.sentiment_score >= -0.3, SentimentAnalysis.sentiment_score <= 0.3), 1))).label("neutral_count"),
+    ).where(SentimentAnalysis.analyzed_at >= since)
 
-    # Count bullish (score > 0.3), bearish (score < -0.3), neutral
-    bullish_stmt = (
-        select(func.count())
-        .select_from(SentimentAnalysis)
-        .where(
-            and_(
-                SentimentAnalysis.analyzed_at >= since,
-                SentimentAnalysis.sentiment_score > 0.3,
-            )
-        )
-    )
-    bearish_stmt = (
-        select(func.count())
-        .select_from(SentimentAnalysis)
-        .where(
-            and_(
-                SentimentAnalysis.analyzed_at >= since,
-                SentimentAnalysis.sentiment_score < -0.3,
-            )
-        )
-    )
-    neutral_stmt = (
-        select(func.count())
-        .select_from(SentimentAnalysis)
-        .where(
-            and_(
-                SentimentAnalysis.analyzed_at >= since,
-                SentimentAnalysis.sentiment_score >= -0.3,
-                SentimentAnalysis.sentiment_score <= 0.3,
-            )
-        )
-    )
+    agg_result = await db.execute(agg_stmt)
+    row = agg_result.first()
 
-    bullish_result = await db.execute(bullish_stmt)
-    bearish_result = await db.execute(bearish_stmt)
-    neutral_result = await db.execute(neutral_stmt)
-
-    bullish_count = bullish_result.scalar_one()
-    bearish_count = bearish_result.scalar_one()
-    neutral_count = neutral_result.scalar_one()
+    if row:
+        market_sentiment = row[0] or 0.0
+        bullish_count = row[1] or 0
+        bearish_count = row[2] or 0
+        neutral_count = row[3] or 0
+    else:
+        market_sentiment = 0.0
+        bullish_count = bearish_count = neutral_count = 0
 
     # Get top movers by alpha composite_score (most recent metrics)
     top_movers_stmt = (
