@@ -91,7 +91,7 @@ class TestSentimentReanalysis:
         with patch("app.api.v1.sentiment._celery_app.send_task") as mock_send_task, patch(
             "app.api.v1.sentiment.reanalysis_status_service.start_reanalysis",
             new_callable=AsyncMock
-        ) as mock_start_reanalysis:
+        ) as _mock_start_reanalysis:
             mock_send_task.return_value = MagicMock(id="task-123")
 
             resp = await client.post(
