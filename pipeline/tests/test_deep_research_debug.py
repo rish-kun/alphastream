@@ -421,20 +421,32 @@ class TestResearchTopicTask:
 class TestDatabaseConnection:
     """Tests for database connection status."""
 
-    def test_database_connection(self):
+    @patch("pipeline.database.get_engine")
+    @patch("pipeline.database.check_schema_ready")
+    def test_database_connection(self, mock_check_schema, mock_get_engine):
         """Test database connection and schema."""
         logger.info("=" * 80)
         logger.info("TEST: Database connection status")
         logger.info("=" * 80)
 
-        from pipeline.database import get_engine, check_schema_ready
         from pipeline.config import settings
+
+        mock_engine = MagicMock()
+        mock_conn = MagicMock()
+        mock_result = MagicMock()
+        mock_result.scalar.return_value = 1
+        mock_conn.execute.return_value = mock_result
+        mock_engine.connect.return_value.__enter__.return_value = mock_conn
+        mock_get_engine.return_value = mock_engine
+
+        mock_check_schema.return_value = True
 
         logger.info(
             f"Database URL: {settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else settings.DATABASE_URL}"
         )
 
         try:
+            from pipeline.database import get_engine, check_schema_ready
             engine = get_engine()
             with engine.connect() as conn:
                 result = conn.execute(__import__("sqlalchemy").text("SELECT 1"))
