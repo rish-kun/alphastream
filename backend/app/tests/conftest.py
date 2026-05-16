@@ -177,6 +177,11 @@ class MockResult:
             return 0
         return self._scalar
 
+    def first(self):
+        if self._data and isinstance(self._data, list) and len(self._data) > 0:
+            return self._data[0]
+        return None
+
 
 @pytest.fixture
 def mock_result():
