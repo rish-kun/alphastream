@@ -9,6 +9,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.news import ArticleStockMention
+    from app.models.sentiment import AlphaMetric
+    from app.models.portfolio import PortfolioStock
+
+
+
 
 class Stock(Base):
     __tablename__ = "stocks"
