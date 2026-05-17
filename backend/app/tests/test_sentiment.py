@@ -74,11 +74,17 @@ class TestSectorSentiment:
         # Mock sector rows: (sector_name, avg_sentiment, article_count)
         sector_row = ("Banking & Finance", 0.45, 25)
 
+        # Mock top stocks rows: (sector_name, ticker)
+        top_stocks_rows = [
+            ("Banking & Finance", "HDFCBANK"),
+            ("Banking & Finance", "ICICIBANK"),
+        ]
+
         # First call: sector query returns one row
-        # Second call: top stocks query for that sector
+        # Second call: top stocks query for all sectors
         mock_db.execute.side_effect = [
             MockResult(data=[sector_row]),  # sector query
-            MockResult(data=[("HDFCBANK",), ("ICICIBANK",)]),  # top stocks
+            MockResult(data=top_stocks_rows),  # top stocks for all sectors
         ]
 
         resp = await client.get("/api/v1/sentiment/sectors")
